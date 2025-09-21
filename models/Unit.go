@@ -9,7 +9,7 @@ type Unit struct {
 	PrimaryColor   string `gorm:"size:7"`
 	SecondaryColor string `gorm:"size:7"`
 	CategoryID     *uint
-	Category       *Category `gorm:"foreignKey:CategoryID"`
+	Category       *Category `gorm:"foreignKey:CategoryID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
 	Artists        []ArtistUnit `gorm:"foreignKey:UnitID"`
 
 	CreatedAt time.Time
