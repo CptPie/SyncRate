@@ -14,6 +14,13 @@ type AlbumSong struct {
 	Song    Song  `gorm:"foreignKey:SongID"`
 }
 
+type SongUnit struct {
+	SongID uint `gorm:"primaryKey"`
+	UnitID uint `gorm:"primaryKey"`
+	Song   Song `gorm:"foreignKey:SongID"`
+	Unit   Unit `gorm:"foreignKey:UnitID"`
+}
+
 type ArtistUnit struct {
 	ArtistID uint   `gorm:"primaryKey"`
 	UnitID   uint   `gorm:"primaryKey"`

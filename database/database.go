@@ -46,7 +46,7 @@ func (db *Database) Migrate() error {
 		return fmt.Errorf("Migration failed for base tables: %s", err.Error())
 	}
 
-	// Then migrate Song (depends on Unit via UnitID and Category via CategoryID foreign keys)
+	// Then migrate Song (depends on Category via CategoryID foreign key)
 	err = db.DB.AutoMigrate(&models.Song{})
 	if err != nil {
 		return fmt.Errorf("Migration failed for Song: %s", err.Error())
@@ -61,6 +61,7 @@ func (db *Database) Migrate() error {
 	// Finally migrate join tables (depend on the main tables)
 	err = db.DB.AutoMigrate(
 		&models.SongArtist{},
+		&models.SongUnit{},
 		&models.AlbumSong{},
 		&models.ArtistUnit{},
 	)

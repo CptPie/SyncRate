@@ -474,3 +474,159 @@ func (db *Database) ArtistUnitExists(artistID, unitID uint) (bool, error) {
 	}
 	return count > 0, nil
 }
+
+// SongUnit operations
+
+func (db *Database) validateSongUnit(songUnit *models.SongUnit) error {
+	if songUnit == nil {
+		return errors.New("song unit cannot be nil")
+	}
+
+	if songUnit.SongID == 0 {
+		return errors.New("song ID cannot be zero")
+	}
+
+	if songUnit.UnitID == 0 {
+		return errors.New("unit ID cannot be zero")
+	}
+
+	// Check if song exists
+	songExists, err := db.SongExists(songUnit.SongID)
+	if err != nil {
+		return fmt.Errorf("failed to check if song exists: %w", err)
+	}
+	if !songExists {
+		return errors.New("song does not exist")
+	}
+
+	// Check if unit exists
+	unitExists, err := db.UnitExists(songUnit.UnitID)
+	if err != nil {
+		return fmt.Errorf("failed to check if unit exists: %w", err)
+	}
+	if !unitExists {
+		return errors.New("unit does not exist")
+	}
+
+	return nil
+}
+
+func (db *Database) CreateSongUnit(songUnit *models.SongUnit) error {
+	if err := db.validateSongUnit(songUnit); err != nil {
+		return fmt.Errorf("validation failed: %w", err)
+	}
+
+	// Check if relationship already exists
+	exists, err := db.SongUnitExists(songUnit.SongID, songUnit.UnitID)
+	if err != nil {
+		return fmt.Errorf("failed to check if song unit relationship exists: %w", err)
+	}
+	if exists {
+		return errors.New("song unit relationship already exists")
+	}
+
+	if err := db.DB.Create(songUnit).Error; err != nil {
+		return fmt.Errorf("failed to create song unit relationship: %w", err)
+	}
+	return nil
+}
+
+func (db *Database) GetSongUnit(songID, unitID uint) (*models.SongUnit, error) {
+	if songID == 0 {
+		return nil, errors.New("song ID cannot be zero")
+	}
+	if unitID == 0 {
+		return nil, errors.New("unit ID cannot be zero")
+	}
+
+	var songUnit models.SongUnit
+	if err := db.DB.Preload("Song").Preload("Unit").
+		Where("song_id = ? AND unit_id = ?", songID, unitID).First(&songUnit).Error; err != nil {
+		return nil, fmt.Errorf("failed to get song unit relationship: %w", err)
+	}
+	return &songUnit, nil
+}
+
+func (db *Database) GetUnitsBySong(songID uint) ([]models.Unit, error) {
+	if songID == 0 {
+		return nil, errors.New("song ID cannot be zero")
+	}
+
+	// Check if song exists
+	exists, err := db.SongExists(songID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if song exists: %w", err)
+	}
+	if !exists {
+		return nil, errors.New("song does not exist")
+	}
+
+	var units []models.Unit
+	if err := db.DB.Table("units").
+		Joins("JOIN song_units ON units.unit_id = song_units.unit_id").
+		Where("song_units.song_id = ?", songID).
+		Find(&units).Error; err != nil {
+		return nil, fmt.Errorf("failed to get units by song: %w", err)
+	}
+	return units, nil
+}
+
+func (db *Database) GetSongsByUnit(unitID uint) ([]models.Song, error) {
+	if unitID == 0 {
+		return nil, errors.New("unit ID cannot be zero")
+	}
+
+	// Check if unit exists
+	exists, err := db.UnitExists(unitID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if unit exists: %w", err)
+	}
+	if !exists {
+		return nil, errors.New("unit does not exist")
+	}
+
+	var songs []models.Song
+	if err := db.DB.Table("songs").
+		Joins("JOIN song_units ON songs.song_id = song_units.song_id").
+		Where("song_units.unit_id = ?", unitID).
+		Find(&songs).Error; err != nil {
+		return nil, fmt.Errorf("failed to get songs by unit: %w", err)
+	}
+	return songs, nil
+}
+
+func (db *Database) DeleteSongUnit(songID, unitID uint) error {
+	if songID == 0 {
+		return errors.New("song ID cannot be zero")
+	}
+	if unitID == 0 {
+		return errors.New("unit ID cannot be zero")
+	}
+
+	// Check if relationship exists
+	exists, err := db.SongUnitExists(songID, unitID)
+	if err != nil {
+		return fmt.Errorf("failed to check if song unit relationship exists: %w", err)
+	}
+	if !exists {
+		return errors.New("song unit relationship does not exist")
+	}
+
+	if err := db.DB.Where("song_id = ? AND unit_id = ?", songID, unitID).Delete(&models.SongUnit{}).Error; err != nil {
+		return fmt.Errorf("failed to delete song unit relationship: %w", err)
+	}
+	return nil
+}
+
+func (db *Database) SongUnitExists(songID, unitID uint) (bool, error) {
+	if songID == 0 || unitID == 0 {
+		return false, nil
+	}
+
+	var count int64
+	if err := db.DB.Model(&models.SongUnit{}).
+		Where("song_id = ? AND unit_id = ?", songID, unitID).Count(&count).Error; err != nil {
+		return false, fmt.Errorf("failed to check if song unit relationship exists: %w", err)
+	}
+	return count > 0, nil
+}

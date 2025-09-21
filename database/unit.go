@@ -137,9 +137,9 @@ func (db *Database) DeleteUnit(unitID uint) error {
 		return errors.New("unit does not exist")
 	}
 
-	// Check if unit has songs associated with it
+	// Check if unit has songs associated with it via SongUnit join table
 	var songCount int64
-	if err := db.DB.Model(&models.Song{}).Where("unit_id = ?", unitID).Count(&songCount).Error; err != nil {
+	if err := db.DB.Model(&models.SongUnit{}).Where("unit_id = ?", unitID).Count(&songCount).Error; err != nil {
 		return fmt.Errorf("failed to check unit song relationships: %w", err)
 	}
 	if songCount > 0 {
@@ -202,7 +202,7 @@ func (db *Database) SearchUnits(query string) ([]models.Unit, error) {
 func (db *Database) GetUnitsWithSongs() ([]models.Unit, error) {
 	var units []models.Unit
 	if err := db.DB.Preload("Category").Preload("Artists").
-		Joins("JOIN songs ON units.unit_id = songs.unit_id").
+		Joins("JOIN song_units ON units.unit_id = song_units.unit_id").
 		Distinct().Find(&units).Error; err != nil {
 		return nil, fmt.Errorf("failed to get units with songs: %w", err)
 	}
@@ -212,7 +212,7 @@ func (db *Database) GetUnitsWithSongs() ([]models.Unit, error) {
 func (db *Database) GetUnitsWithoutSongs() ([]models.Unit, error) {
 	var units []models.Unit
 	if err := db.DB.Preload("Category").Preload("Artists").
-		Where("unit_id NOT IN (SELECT DISTINCT unit_id FROM songs WHERE unit_id IS NOT NULL)").
+		Where("unit_id NOT IN (SELECT DISTINCT unit_id FROM song_units)").
 		Find(&units).Error; err != nil {
 		return nil, fmt.Errorf("failed to get units without songs: %w", err)
 	}
@@ -234,7 +234,7 @@ func (db *Database) GetSongCountForUnit(unitID uint) (int64, error) {
 	}
 
 	var count int64
-	if err := db.DB.Model(&models.Song{}).Where("unit_id = ?", unitID).Count(&count).Error; err != nil {
+	if err := db.DB.Model(&models.SongUnit{}).Where("unit_id = ?", unitID).Count(&count).Error; err != nil {
 		return 0, fmt.Errorf("failed to count songs for unit: %w", err)
 	}
 	return count, nil
