@@ -55,6 +55,18 @@ func (db *Database) validateArtist(artist *models.Artist, isUpdate bool) error {
 	if artist == nil {
 		return errors.New("artist cannot be nil")
 	}
+
+	// CategoryID validation (if provided)
+	if artist.CategoryID != nil && *artist.CategoryID != 0 {
+		exists, err := db.CategoryExists(*artist.CategoryID)
+		if err != nil {
+			return fmt.Errorf("failed to check if category exists: %w", err)
+		}
+		if !exists {
+			return errors.New("specified category does not exist")
+		}
+	}
+
 	return db.validateColoredEntity(artist, "artist", isUpdate)
 }
 
@@ -92,7 +104,7 @@ func (db *Database) GetArtistByID(artistID uint) (*models.Artist, error) {
 	}
 
 	var artist models.Artist
-	if err := db.DB.Preload("Units").Preload("Songs").First(&artist, artistID).Error; err != nil {
+	if err := db.DB.Preload("Category").Preload("Units").Preload("Songs").First(&artist, artistID).Error; err != nil {
 		return nil, fmt.Errorf("failed to get artist: %w", err)
 	}
 	return &artist, nil
@@ -105,7 +117,7 @@ func (db *Database) GetArtistsByName(name string) ([]models.Artist, error) {
 
 	var artists []models.Artist
 	searchPattern := "%" + name + "%"
-	if err := db.DB.Preload("Units").Preload("Songs").
+	if err := db.DB.Preload("Category").Preload("Units").Preload("Songs").
 		Where("name_original ILIKE ? OR name_english ILIKE ?", searchPattern, searchPattern).
 		Find(&artists).Error; err != nil {
 		return nil, fmt.Errorf("failed to search artists by name: %w", err)
@@ -113,14 +125,23 @@ func (db *Database) GetArtistsByName(name string) ([]models.Artist, error) {
 	return artists, nil
 }
 
-func (db *Database) GetArtistsByCategory(category string) ([]models.Artist, error) {
-	if strings.TrimSpace(category) == "" {
-		return nil, errors.New("category cannot be empty")
+func (db *Database) GetArtistsByCategory(categoryID uint) ([]models.Artist, error) {
+	if categoryID == 0 {
+		return nil, errors.New("category ID cannot be zero")
+	}
+
+	// Verify category exists
+	exists, err := db.CategoryExists(categoryID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if category exists: %w", err)
+	}
+	if !exists {
+		return nil, errors.New("category does not exist")
 	}
 
 	var artists []models.Artist
-	if err := db.DB.Preload("Units").Preload("Songs").
-		Where("category = ?", category).Find(&artists).Error; err != nil {
+	if err := db.DB.Preload("Category").Preload("Units").Preload("Songs").
+		Where("category_id = ?", categoryID).Find(&artists).Error; err != nil {
 		return nil, fmt.Errorf("failed to get artists by category: %w", err)
 	}
 	return artists, nil
@@ -128,7 +149,7 @@ func (db *Database) GetArtistsByCategory(category string) ([]models.Artist, erro
 
 func (db *Database) GetAllArtists() ([]models.Artist, error) {
 	var artists []models.Artist
-	if err := db.DB.Preload("Units").Preload("Songs").Find(&artists).Error; err != nil {
+	if err := db.DB.Preload("Category").Preload("Units").Preload("Songs").Find(&artists).Error; err != nil {
 		return nil, fmt.Errorf("failed to get all artists: %w", err)
 	}
 	return artists, nil
@@ -204,7 +225,7 @@ func (db *Database) GetArtistsByColor(color string) ([]models.Artist, error) {
 	}
 
 	var artists []models.Artist
-	if err := db.DB.Preload("Units").Preload("Songs").
+	if err := db.DB.Preload("Category").Preload("Units").Preload("Songs").
 		Where("primary_color = ? OR secondary_color = ?", color, color).
 		Find(&artists).Error; err != nil {
 		return nil, fmt.Errorf("failed to get artists by color: %w", err)
@@ -219,8 +240,9 @@ func (db *Database) SearchArtists(query string) ([]models.Artist, error) {
 
 	var artists []models.Artist
 	searchPattern := "%" + query + "%"
-	if err := db.DB.Preload("Units").Preload("Songs").
-		Where("name_original ILIKE ? OR name_english ILIKE ? OR category ILIKE ?",
+	if err := db.DB.Preload("Category").Preload("Units").Preload("Songs").
+		Joins("LEFT JOIN categories ON artists.category_id = categories.category_id").
+		Where("name_original ILIKE ? OR name_english ILIKE ? OR categories.name ILIKE ?",
 			searchPattern, searchPattern, searchPattern).
 		Find(&artists).Error; err != nil {
 		return nil, fmt.Errorf("failed to search artists: %w", err)

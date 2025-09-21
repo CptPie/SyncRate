@@ -8,7 +8,8 @@ type Song struct {
 	NameEnglish  string `gorm:"size:255"`
 	SourceURL    string `gorm:"not null"`
 	ThumbnailURL string `gorm:"not null"`
-	Category     string
+	CategoryID   *uint
+	Category     *Category `gorm:"foreignKey:CategoryID"`
 	IsCover      bool
 	UnitID       *uint
 	Unit         *Unit        `gorm:"foreignKey:UnitID"`

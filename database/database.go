@@ -29,8 +29,14 @@ func (db *Database) Connect() error {
 }
 
 func (db *Database) Migrate() error {
-	// First migrate the base tables (no foreign key dependencies)
-	err := db.DB.AutoMigrate(
+	// First migrate Category table (no dependencies)
+	err := db.DB.AutoMigrate(&models.Category{})
+	if err != nil {
+		return fmt.Errorf("Migration failed for Category: %s", err.Error())
+	}
+
+	// Then migrate the base tables (now depend on Category via CategoryID foreign key)
+	err = db.DB.AutoMigrate(
 		&models.User{},
 		&models.Unit{},
 		&models.Artist{},
@@ -40,7 +46,7 @@ func (db *Database) Migrate() error {
 		return fmt.Errorf("Migration failed for base tables: %s", err.Error())
 	}
 
-	// Then migrate Song (depends on Unit via UnitID foreign key)
+	// Then migrate Song (depends on Unit via UnitID and Category via CategoryID foreign keys)
 	err = db.DB.AutoMigrate(&models.Song{})
 	if err != nil {
 		return fmt.Errorf("Migration failed for Song: %s", err.Error())

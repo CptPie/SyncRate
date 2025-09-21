@@ -54,6 +54,17 @@ func (db *Database) validateSong(song *models.Song, isUpdate bool) error {
 		}
 	}
 
+	// CategoryID validation (if provided)
+	if song.CategoryID != nil && *song.CategoryID != 0 {
+		exists, err := db.CategoryExists(*song.CategoryID)
+		if err != nil {
+			return fmt.Errorf("failed to check if category exists: %w", err)
+		}
+		if !exists {
+			return errors.New("specified category does not exist")
+		}
+	}
+
 	return nil
 }
 
@@ -74,7 +85,7 @@ func (db *Database) GetSongByID(songID uint) (*models.Song, error) {
 	}
 
 	var song models.Song
-	if err := db.DB.Preload("Unit").Preload("Artists").Preload("Albums").First(&song, songID).Error; err != nil {
+	if err := db.DB.Preload("Unit").Preload("Category").Preload("Artists").Preload("Albums").First(&song, songID).Error; err != nil {
 		return nil, fmt.Errorf("failed to get song: %w", err)
 	}
 	return &song, nil
@@ -87,7 +98,7 @@ func (db *Database) GetSongsByName(name string) ([]models.Song, error) {
 
 	var songs []models.Song
 	searchPattern := "%" + name + "%"
-	if err := db.DB.Preload("Unit").Preload("Artists").Preload("Albums").
+	if err := db.DB.Preload("Unit").Preload("Category").Preload("Artists").Preload("Albums").
 		Where("name_original ILIKE ? OR name_english ILIKE ?", searchPattern, searchPattern).
 		Find(&songs).Error; err != nil {
 		return nil, fmt.Errorf("failed to search songs by name: %w", err)
@@ -95,14 +106,23 @@ func (db *Database) GetSongsByName(name string) ([]models.Song, error) {
 	return songs, nil
 }
 
-func (db *Database) GetSongsByCategory(category string) ([]models.Song, error) {
-	if strings.TrimSpace(category) == "" {
-		return nil, errors.New("category cannot be empty")
+func (db *Database) GetSongsByCategory(categoryID uint) ([]models.Song, error) {
+	if categoryID == 0 {
+		return nil, errors.New("category ID cannot be zero")
+	}
+
+	// Verify category exists
+	exists, err := db.CategoryExists(categoryID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if category exists: %w", err)
+	}
+	if !exists {
+		return nil, errors.New("category does not exist")
 	}
 
 	var songs []models.Song
-	if err := db.DB.Preload("Unit").Preload("Artists").Preload("Albums").
-		Where("category = ?", category).Find(&songs).Error; err != nil {
+	if err := db.DB.Preload("Unit").Preload("Category").Preload("Artists").Preload("Albums").
+		Where("category_id = ?", categoryID).Find(&songs).Error; err != nil {
 		return nil, fmt.Errorf("failed to get songs by category: %w", err)
 	}
 	return songs, nil
@@ -123,7 +143,7 @@ func (db *Database) GetSongsByUnit(unitID uint) ([]models.Song, error) {
 	}
 
 	var songs []models.Song
-	if err := db.DB.Preload("Unit").Preload("Artists").Preload("Albums").
+	if err := db.DB.Preload("Unit").Preload("Category").Preload("Artists").Preload("Albums").
 		Where("unit_id = ?", unitID).Find(&songs).Error; err != nil {
 		return nil, fmt.Errorf("failed to get songs by unit: %w", err)
 	}
@@ -132,7 +152,7 @@ func (db *Database) GetSongsByUnit(unitID uint) ([]models.Song, error) {
 
 func (db *Database) GetCoverSongs() ([]models.Song, error) {
 	var songs []models.Song
-	if err := db.DB.Preload("Unit").Preload("Artists").Preload("Albums").
+	if err := db.DB.Preload("Unit").Preload("Category").Preload("Artists").Preload("Albums").
 		Where("is_cover = ?", true).Find(&songs).Error; err != nil {
 		return nil, fmt.Errorf("failed to get cover songs: %w", err)
 	}
@@ -141,7 +161,7 @@ func (db *Database) GetCoverSongs() ([]models.Song, error) {
 
 func (db *Database) GetOriginalSongs() ([]models.Song, error) {
 	var songs []models.Song
-	if err := db.DB.Preload("Unit").Preload("Artists").Preload("Albums").
+	if err := db.DB.Preload("Unit").Preload("Category").Preload("Artists").Preload("Albums").
 		Where("is_cover = ?", false).Find(&songs).Error; err != nil {
 		return nil, fmt.Errorf("failed to get original songs: %w", err)
 	}
@@ -150,7 +170,7 @@ func (db *Database) GetOriginalSongs() ([]models.Song, error) {
 
 func (db *Database) GetAllSongs() ([]models.Song, error) {
 	var songs []models.Song
-	if err := db.DB.Preload("Unit").Preload("Artists").Preload("Albums").Find(&songs).Error; err != nil {
+	if err := db.DB.Preload("Unit").Preload("Category").Preload("Artists").Preload("Albums").Find(&songs).Error; err != nil {
 		return nil, fmt.Errorf("failed to get all songs: %w", err)
 	}
 	return songs, nil
@@ -222,7 +242,7 @@ func (db *Database) GetSongsBySourceURL(sourceURL string) (*models.Song, error) 
 	}
 
 	var song models.Song
-	if err := db.DB.Preload("Unit").Preload("Artists").Preload("Albums").
+	if err := db.DB.Preload("Unit").Preload("Category").Preload("Artists").Preload("Albums").
 		Where("source_url = ?", sourceURL).First(&song).Error; err != nil {
 		return nil, fmt.Errorf("failed to get song by source URL: %w", err)
 	}

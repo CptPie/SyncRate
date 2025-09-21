@@ -8,7 +8,8 @@ type Artist struct {
 	NameEnglish    string `gorm:"size:255"`
 	PrimaryColor   string `gorm:"size:7"`
 	SecondaryColor string `gorm:"size:7"`
-	Category       string
+	CategoryID     *uint
+	Category       *Category `gorm:"foreignKey:CategoryID"`
 	Units          []ArtistUnit `gorm:"foreignKey:ArtistID"`
 	Songs          []SongArtist `gorm:"foreignKey:ArtistID"`
 

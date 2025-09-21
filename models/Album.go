@@ -8,7 +8,8 @@ type Album struct {
 	NameEnglish  string `gorm:"size:255"`
 	AlbumArtURL  string
 	Type         string `gorm:"size:20;check:type IN ('Album','Single','EP')"`
-	Category     string
+	CategoryID   *uint
+	Category     *Category `gorm:"foreignKey:CategoryID"`
 	Songs        []AlbumSong `gorm:"foreignKey:AlbumID"`
 
 	CreatedAt time.Time

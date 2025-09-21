@@ -12,6 +12,18 @@ func (db *Database) validateUnit(unit *models.Unit, isUpdate bool) error {
 	if unit == nil {
 		return errors.New("unit cannot be nil")
 	}
+
+	// CategoryID validation (if provided)
+	if unit.CategoryID != nil && *unit.CategoryID != 0 {
+		exists, err := db.CategoryExists(*unit.CategoryID)
+		if err != nil {
+			return fmt.Errorf("failed to check if category exists: %w", err)
+		}
+		if !exists {
+			return errors.New("specified category does not exist")
+		}
+	}
+
 	return db.validateColoredEntity(unit, "unit", isUpdate)
 }
 
@@ -32,7 +44,7 @@ func (db *Database) GetUnitByID(unitID uint) (*models.Unit, error) {
 	}
 
 	var unit models.Unit
-	if err := db.DB.Preload("Artists").First(&unit, unitID).Error; err != nil {
+	if err := db.DB.Preload("Category").Preload("Artists").First(&unit, unitID).Error; err != nil {
 		return nil, fmt.Errorf("failed to get unit: %w", err)
 	}
 	return &unit, nil
@@ -45,7 +57,7 @@ func (db *Database) GetUnitsByName(name string) ([]models.Unit, error) {
 
 	var units []models.Unit
 	searchPattern := "%" + name + "%"
-	if err := db.DB.Preload("Artists").
+	if err := db.DB.Preload("Category").Preload("Artists").
 		Where("name_original ILIKE ? OR name_english ILIKE ?", searchPattern, searchPattern).
 		Find(&units).Error; err != nil {
 		return nil, fmt.Errorf("failed to search units by name: %w", err)
@@ -53,14 +65,23 @@ func (db *Database) GetUnitsByName(name string) ([]models.Unit, error) {
 	return units, nil
 }
 
-func (db *Database) GetUnitsByCategory(category string) ([]models.Unit, error) {
-	if strings.TrimSpace(category) == "" {
-		return nil, errors.New("category cannot be empty")
+func (db *Database) GetUnitsByCategory(categoryID uint) ([]models.Unit, error) {
+	if categoryID == 0 {
+		return nil, errors.New("category ID cannot be zero")
+	}
+
+	// Verify category exists
+	exists, err := db.CategoryExists(categoryID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if category exists: %w", err)
+	}
+	if !exists {
+		return nil, errors.New("category does not exist")
 	}
 
 	var units []models.Unit
-	if err := db.DB.Preload("Artists").
-		Where("category = ?", category).Find(&units).Error; err != nil {
+	if err := db.DB.Preload("Category").Preload("Artists").
+		Where("category_id = ?", categoryID).Find(&units).Error; err != nil {
 		return nil, fmt.Errorf("failed to get units by category: %w", err)
 	}
 	return units, nil
@@ -68,7 +89,7 @@ func (db *Database) GetUnitsByCategory(category string) ([]models.Unit, error) {
 
 func (db *Database) GetAllUnits() ([]models.Unit, error) {
 	var units []models.Unit
-	if err := db.DB.Preload("Artists").Find(&units).Error; err != nil {
+	if err := db.DB.Preload("Category").Preload("Artists").Find(&units).Error; err != nil {
 		return nil, fmt.Errorf("failed to get all units: %w", err)
 	}
 	return units, nil
@@ -153,7 +174,7 @@ func (db *Database) GetUnitsByColor(color string) ([]models.Unit, error) {
 	}
 
 	var units []models.Unit
-	if err := db.DB.Preload("Artists").
+	if err := db.DB.Preload("Category").Preload("Artists").
 		Where("primary_color = ? OR secondary_color = ?", color, color).
 		Find(&units).Error; err != nil {
 		return nil, fmt.Errorf("failed to get units by color: %w", err)
@@ -168,8 +189,9 @@ func (db *Database) SearchUnits(query string) ([]models.Unit, error) {
 
 	var units []models.Unit
 	searchPattern := "%" + query + "%"
-	if err := db.DB.Preload("Artists").
-		Where("name_original ILIKE ? OR name_english ILIKE ? OR category ILIKE ?",
+	if err := db.DB.Preload("Category").Preload("Artists").
+		Joins("LEFT JOIN categories ON units.category_id = categories.category_id").
+		Where("name_original ILIKE ? OR name_english ILIKE ? OR categories.name ILIKE ?",
 			searchPattern, searchPattern, searchPattern).
 		Find(&units).Error; err != nil {
 		return nil, fmt.Errorf("failed to search units: %w", err)
@@ -179,7 +201,7 @@ func (db *Database) SearchUnits(query string) ([]models.Unit, error) {
 
 func (db *Database) GetUnitsWithSongs() ([]models.Unit, error) {
 	var units []models.Unit
-	if err := db.DB.Preload("Artists").
+	if err := db.DB.Preload("Category").Preload("Artists").
 		Joins("JOIN songs ON units.unit_id = songs.unit_id").
 		Distinct().Find(&units).Error; err != nil {
 		return nil, fmt.Errorf("failed to get units with songs: %w", err)
@@ -189,7 +211,7 @@ func (db *Database) GetUnitsWithSongs() ([]models.Unit, error) {
 
 func (db *Database) GetUnitsWithoutSongs() ([]models.Unit, error) {
 	var units []models.Unit
-	if err := db.DB.Preload("Artists").
+	if err := db.DB.Preload("Category").Preload("Artists").
 		Where("unit_id NOT IN (SELECT DISTINCT unit_id FROM songs WHERE unit_id IS NOT NULL)").
 		Find(&units).Error; err != nil {
 		return nil, fmt.Errorf("failed to get units without songs: %w", err)
