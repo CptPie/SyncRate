@@ -1,0 +1,51 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15
+    container_name: postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: SyncRate
+      POSTGRES_PASSWORD: superSecret123
+      POSTGRES_DB: SyncRate
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  adminer:
+    image: adminer
+    container_name: adminer
+    restart: always
+    ports:
+      - "8081:8080"
+    depends_on:
+      - db
+
+  app:
+    build:
+      context: .
+      target: development # Use dev stage
+    container_name: SyncRate
+    restart: always
+    depends_on:
+      - db
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: SyncRate
+      DB_PASSWORD: superSecret123
+      DB_NAME: SyncRate
+    ports:
+      - "8080:8080"
+    volumes:
+      # Mount sourcecode
+      - .:/app
+      # Exclude tmp dir
+      - /app/tmp
+      # Exclude go mod cache
+      - /go/pkg/mod
+
+volumes:
+  db_data:

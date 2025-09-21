@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15
+    container_name: postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: SyncRate
+      POSTGRES_PASSWORD: superSecret123
+      POSTGRES_DB: SyncRate
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  app:
+    build:
+      context: .
+      target: production # Use production stage
+    container_name: SyncRate
+    restart: always
+    depends_on:
+      - db
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: SyncRate
+      DB_PASSWORD: superSecret123
+      DB_NAME: SyncRate
+    ports:
+      - "8080:8080"
+    # No volumes needed for production
+
+volumes:
+  db_data:
