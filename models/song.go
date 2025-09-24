@@ -9,7 +9,7 @@ type Song struct {
 	SourceURL    string `gorm:"not null"`
 	ThumbnailURL string `gorm:"not null"`
 	CategoryID   *uint
-	Category     *Category    `gorm:"foreignKey:CategoryID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
+	Category     *Category    `gorm:"foreignKey:CategoryID;references:CategoryID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
 	IsCover      bool
 	Units        []SongUnit   `gorm:"foreignKey:SongID"`
 	Artists      []SongArtist `gorm:"foreignKey:SongID"`

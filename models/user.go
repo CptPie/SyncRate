@@ -10,7 +10,7 @@ type User struct {
 	PasswordHash string
 	DiscordID    string `gorm:"uniqueIndex"`
 	Email        string
-	Votes        []Vote `gorm:"foreignKey:UserID"`
+	Votes        []Vote `gorm:"foreignKey:UserID;references:UserID"`
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
