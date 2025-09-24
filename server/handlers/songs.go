@@ -15,7 +15,7 @@ func GetSongs(db *gorm.DB) gin.HandlerFunc {
 		log.Println("GetSongs: Starting to load all songs")
 
 		var songs []models.Song
-		result := db.Preload("Artists.Artist").Preload("Category").Find(&songs)
+		result := db.Preload("Artists").Preload("Category").Find(&songs)
 		if result.Error != nil {
 			log.Printf("GetSongs: Database error: %v", result.Error)
 			c.HTML(http.StatusInternalServerError, "error.html", gin.H{
@@ -48,7 +48,7 @@ func GetSong(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		var song models.Song
-		result := db.Preload("Artists.Artist").Preload("Category").Preload("Units").First(&song, uint(id))
+		result := db.Preload("Artists").Preload("Category").Preload("Units").First(&song, uint(id))
 		if result.Error != nil {
 			if result.Error == gorm.ErrRecordNotFound {
 				log.Printf("GetSong: Song with ID %d not found", id)
@@ -91,4 +91,3 @@ func PostVote(db *gorm.DB) gin.HandlerFunc {
 		})
 	}
 }
-

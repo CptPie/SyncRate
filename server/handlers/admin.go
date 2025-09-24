@@ -846,3 +846,270 @@ func PostAddSong(db *gorm.DB) gin.HandlerFunc {
 		c.Redirect(http.StatusSeeOther, "/admin/add-song")
 	}
 }
+
+// View Songs page
+func GetViewSongs(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log.Println("GetViewSongs: Loading view songs page")
+
+		var songs []models.Song
+		var categories []models.Category
+		var artists []models.Artist
+		var units []models.Unit
+
+		db.Preload("Category").Preload("Artists").Preload("Units").Find(&songs)
+		db.Find(&categories)
+		db.Preload("Category").Find(&artists)
+		db.Preload("Category").Find(&units)
+
+		// Convert to JSON for JavaScript
+		songsJSON, _ := json.Marshal(songs)
+		categoriesJSON, _ := json.Marshal(categories)
+		artistsJSON, _ := json.Marshal(artists)
+		unitsJSON, _ := json.Marshal(units)
+
+		c.HTML(http.StatusOK, "view-songs.html", gin.H{
+			"title":          "View Songs",
+			"songs":          songs,
+			"categories":     categories,
+			"artists":        artists,
+			"units":          units,
+			"songsJSON":      string(songsJSON),
+			"categoriesJSON": string(categoriesJSON),
+			"artistsJSON":    string(artistsJSON),
+			"unitsJSON":      string(unitsJSON),
+		})
+	}
+}
+
+// Edit Song
+func PostEditSong(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		idParam := c.Param("id")
+		log.Printf("PostEditSong: Editing song ID: %s", idParam)
+
+		id, err := strconv.ParseUint(idParam, 10, 32)
+		if err != nil {
+			log.Printf("PostEditSong: Invalid song ID format: %v", err)
+			c.HTML(http.StatusBadRequest, "error.html", gin.H{
+				"error": "Invalid song ID: " + err.Error(),
+			})
+			return
+		}
+
+		nameOrig := strings.TrimSpace(c.PostForm("name_original"))
+		if nameOrig == "" {
+			c.HTML(http.StatusBadRequest, "error.html", gin.H{
+				"error": "Song name is required",
+			})
+			return
+		}
+
+		sourceURL := strings.TrimSpace(c.PostForm("source_url"))
+		if sourceURL == "" {
+			c.HTML(http.StatusBadRequest, "error.html", gin.H{
+				"error": "Source URL is required",
+			})
+			return
+		}
+
+		thumbnailURL := strings.TrimSpace(c.PostForm("thumbnail_url"))
+		if thumbnailURL == "" {
+			c.HTML(http.StatusBadRequest, "error.html", gin.H{
+				"error": "Thumbnail URL is required",
+			})
+			return
+		}
+
+		var song models.Song
+		result := db.First(&song, uint(id))
+		if result.Error != nil {
+			if result.Error == gorm.ErrRecordNotFound {
+				c.HTML(http.StatusNotFound, "error.html", gin.H{
+					"error": "Song not found",
+				})
+				return
+			}
+			log.Printf("PostEditSong: Database error: %v", result.Error)
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+				"error": "Failed to find song: " + result.Error.Error(),
+			})
+			return
+		}
+
+		// Update song fields
+		song.NameOriginal = nameOrig
+		song.NameEnglish = strings.TrimSpace(c.PostForm("name_english"))
+		song.SourceURL = sourceURL
+		song.ThumbnailURL = thumbnailURL
+		song.IsCover = c.PostForm("is_cover") == "true"
+
+		// Parse category ID if provided
+		song.CategoryID = nil
+		if categoryIDStr := strings.TrimSpace(c.PostForm("category_id")); categoryIDStr != "" {
+			if categoryID, err := strconv.ParseUint(categoryIDStr, 10, 32); err == nil {
+				categoryIDUint := uint(categoryID)
+				song.CategoryID = &categoryIDUint
+			}
+		}
+
+		tx := db.Begin()
+
+		result = tx.Save(&song)
+		if result.Error != nil {
+			tx.Rollback()
+			log.Printf("PostEditSong: Error updating song: %v", result.Error)
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+				"error": "Failed to update song: " + result.Error.Error(),
+			})
+			return
+		}
+
+		// Update many2many associations
+		// Clear existing associations and rebuild them
+		if err := tx.Model(&song).Association("Artists").Clear(); err != nil {
+			tx.Rollback()
+			log.Printf("PostEditSong: Error clearing artist associations: %v", err)
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+				"error": "Failed to update artist associations: " + err.Error(),
+			})
+			return
+		}
+
+		if err := tx.Model(&song).Association("Units").Clear(); err != nil {
+			tx.Rollback()
+			log.Printf("PostEditSong: Error clearing unit associations: %v", err)
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+				"error": "Failed to update unit associations: " + err.Error(),
+			})
+			return
+		}
+
+		// Add artist associations
+		if artistIDsStr := strings.TrimSpace(c.PostForm("artist_ids")); artistIDsStr != "" {
+			artistIDs := strings.Split(artistIDsStr, ",")
+			var artists []models.Artist
+			for _, artistIDStr := range artistIDs {
+				if artistID, err := strconv.ParseUint(strings.TrimSpace(artistIDStr), 10, 32); err == nil {
+					artists = append(artists, models.Artist{ArtistID: uint(artistID)})
+				}
+			}
+			if len(artists) > 0 {
+				if err := tx.Model(&song).Association("Artists").Append(artists); err != nil {
+					tx.Rollback()
+					log.Printf("PostEditSong: Error adding artist associations: %v", err)
+					c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+						"error": "Failed to update artist associations: " + err.Error(),
+					})
+					return
+				}
+			}
+		}
+
+		// Add unit associations
+		if unitIDsStr := strings.TrimSpace(c.PostForm("unit_ids")); unitIDsStr != "" {
+			unitIDs := strings.Split(unitIDsStr, ",")
+			var units []models.Unit
+			for _, unitIDStr := range unitIDs {
+				if unitID, err := strconv.ParseUint(strings.TrimSpace(unitIDStr), 10, 32); err == nil {
+					units = append(units, models.Unit{UnitID: uint(unitID)})
+				}
+			}
+			if len(units) > 0 {
+				if err := tx.Model(&song).Association("Units").Append(units); err != nil {
+					tx.Rollback()
+					log.Printf("PostEditSong: Error adding unit associations: %v", err)
+					c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+						"error": "Failed to update unit associations: " + err.Error(),
+					})
+					return
+				}
+			}
+		}
+
+		tx.Commit()
+		log.Printf("PostEditSong: Successfully updated song '%s' with ID %d", song.NameOriginal, song.SongID)
+		c.Redirect(http.StatusSeeOther, "/admin/view-songs")
+	}
+}
+
+// Delete Song
+func PostDeleteSong(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		idParam := c.Param("id")
+		log.Printf("PostDeleteSong: Deleting song ID: %s", idParam)
+
+		id, err := strconv.ParseUint(idParam, 10, 32)
+		if err != nil {
+			log.Printf("PostDeleteSong: Invalid song ID format: %v", err)
+			c.HTML(http.StatusBadRequest, "error.html", gin.H{
+				"error": "Invalid song ID: " + err.Error(),
+			})
+			return
+		}
+
+		// Start transaction to delete song and its associations
+		tx := db.Begin()
+
+		// Delete all many2many associations first
+		var song models.Song
+		result := tx.First(&song, uint(id))
+		if result.Error != nil {
+			tx.Rollback()
+			if result.Error == gorm.ErrRecordNotFound {
+				c.HTML(http.StatusNotFound, "error.html", gin.H{
+					"error": "Song not found",
+				})
+				return
+			}
+			log.Printf("PostDeleteSong: Database error: %v", result.Error)
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+				"error": "Failed to find song: " + result.Error.Error(),
+			})
+			return
+		}
+
+		// Clear associations
+		if err := tx.Model(&song).Association("Artists").Clear(); err != nil {
+			tx.Rollback()
+			log.Printf("PostDeleteSong: Error clearing artist associations: %v", err)
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+				"error": "Failed to delete song associations: " + err.Error(),
+			})
+			return
+		}
+
+		if err := tx.Model(&song).Association("Units").Clear(); err != nil {
+			tx.Rollback()
+			log.Printf("PostDeleteSong: Error clearing unit associations: %v", err)
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+				"error": "Failed to delete song associations: " + err.Error(),
+			})
+			return
+		}
+
+		// Delete votes
+		if err := tx.Where("song_id = ?", id).Delete(&models.Vote{}).Error; err != nil {
+			tx.Rollback()
+			log.Printf("PostDeleteSong: Error deleting votes: %v", err)
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+				"error": "Failed to delete song votes: " + err.Error(),
+			})
+			return
+		}
+
+		// Finally delete the song
+		if err := tx.Delete(&song).Error; err != nil {
+			tx.Rollback()
+			log.Printf("PostDeleteSong: Error deleting song: %v", err)
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+				"error": "Failed to delete song: " + err.Error(),
+			})
+			return
+		}
+
+		tx.Commit()
+		log.Printf("PostDeleteSong: Successfully deleted song with ID %d", id)
+		c.Redirect(http.StatusSeeOther, "/admin/view-songs")
+	}
+}

@@ -350,9 +350,17 @@ h2 {
 }
 
 .song-image {
-  width: 100%;
+  width: 60%;
+  max-width: 300px;
   border-radius: 8px;
   margin-bottom: 20px;
+}
+
+.song-card-image {
+  width: 60%;
+  max-width: 200px;
+  border-radius: 8px;
+  margin-bottom: 12px;
 }
 
 .rating-form {

@@ -63,16 +63,19 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	r.GET("/admin/categories", handlers.GetViewCategories(db))
 	r.GET("/admin/units", handlers.GetViewUnits(db))
 	r.GET("/admin/artists", handlers.GetViewArtists(db))
+	r.GET("/admin/view-songs", handlers.GetViewSongs(db))
 
 	// Edit routes
 	r.POST("/admin/categories/:id/edit", handlers.PostEditCategory(db))
 	r.POST("/admin/units/:id/edit", handlers.PostEditUnit(db))
 	r.POST("/admin/artists/:id/edit", handlers.PostEditArtist(db))
+	r.POST("/admin/songs/:id/edit", handlers.PostEditSong(db))
 
 	// Delete routes
 	r.POST("/admin/categories/:id/delete", handlers.PostDeleteCategory(db))
 	r.POST("/admin/units/:id/delete", handlers.PostDeleteUnit(db))
 	r.POST("/admin/artists/:id/delete", handlers.PostDeleteArtist(db))
+	r.POST("/admin/songs/:id/delete", handlers.PostDeleteSong(db))
 
 	return r
 }

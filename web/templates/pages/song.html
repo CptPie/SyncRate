@@ -22,9 +22,7 @@
             <p>
               <strong>Artists:</strong>
               {{range $index, $songArtist := .song.Artists}} {{if $index}},
-              {{end}}{{if
-              $songArtist.Artist}}{{$songArtist.Artist.NameOriginal}}{{else}}Unknown
-              Artist{{end}} {{end}}
+              {{end}}{{$songArtist.NameOriginal}} {{end}}
             </p>
             {{end}} {{if .song.Category}}
             <p>
@@ -62,7 +60,9 @@
               <h4>Rate this song</h4>
               <form action="/songs/{{.song.SongID}}/vote" method="POST">
                 <select name="rating" required class="form-select">
-                  <option value="" disabled selected hidden>Select rating...</option>
+                  <option value="" disabled selected hidden>
+                    Select rating...
+                  </option>
                   <option value="1">1 - Terrible</option>
                   <option value="2">2 - Poor</option>
                   <option value="3">3 - Below Average</option>
@@ -113,4 +113,3 @@
   </body>
 </html>
 {{end}}
-

@@ -1,0 +1,288 @@
+{{define "view-songs.html"}}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{.title}}</title>
+    <link href="/static/css/style.css" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="container">
+      {{template "header" .}}
+      <main>
+        <div class="admin-header">
+          <h2>View Songs</h2>
+          <a href="/admin" class="btn-secondary">← Back to Admin</a>
+        </div>
+
+        {{if .songs}}
+        <div class="view-grid">
+          {{range .songs}}
+          <div class="view-card">
+            <div class="view-card-header">
+              <h3>{{.NameOriginal}}</h3>
+              <div class="view-card-actions">
+                <button
+                  class="btn-secondary edit-btn"
+                  onclick="openEditModal({{.SongID}})"
+                >
+                  Edit
+                </button>
+                <button
+                  class="btn-danger delete-btn"
+                  onclick="deleteSong({{.SongID}}, '{{.NameOriginal}}')"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+            <div class="view-card-details">
+              {{if .NameEnglish}}
+              <p><strong>English Name:</strong> {{.NameEnglish}}</p>
+              {{end}}
+              {{if .ThumbnailURL}}
+              <div class="song-thumbnail">
+                <img src="{{.ThumbnailURL}}" alt="{{.NameOriginal}}" class="song-card-image">
+              </div>
+              {{end}}
+              {{if .Category}}
+              <p><strong>Category:</strong> {{.Category.Name}}</p>
+              {{end}}
+              {{if .IsCover}}
+              <p><strong>Type:</strong> Cover Version</p>
+              {{end}}
+              {{if .Artists}}
+              <p><strong>Artists:</strong></p>
+              <ul class="member-list">
+                {{range .Artists}}
+                <li>{{.NameOriginal}}</li>
+                {{end}}
+              </ul>
+              {{end}}
+              {{if .Units}}
+              <p><strong>Units:</strong></p>
+              <ul class="member-list">
+                {{range .Units}}
+                <li>{{.NameOriginal}}</li>
+                {{end}}
+              </ul>
+              {{end}}
+              <p><strong>Source:</strong> <a href="{{.SourceURL}}" target="_blank" rel="noopener">View Source</a></p>
+              <p><strong>ID:</strong> {{.SongID}}</p>
+              <p>
+                <strong>Created:</strong>
+                {{.CreatedAt.Format "2006-01-02 15:04"}}
+              </p>
+              {{if ne .CreatedAt .UpdatedAt}}
+              <p>
+                <strong>Updated:</strong>
+                {{.UpdatedAt.Format "2006-01-02 15:04"}}
+              </p>
+              {{end}}
+            </div>
+          </div>
+          {{end}}
+        </div>
+        {{else}}
+        <div class="empty-state">
+          <p>No songs found.</p>
+          <a href="/admin/add-song" class="btn-primary">Add First Song</a>
+        </div>
+        {{end}}
+      </main>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal" style="display: none">
+      <div class="modal-content large-modal">
+        <div class="modal-header">
+          <h3>Edit Song</h3>
+          <button type="button" class="modal-close" onclick="closeEditModal()">
+            &times;
+          </button>
+        </div>
+        <form id="editForm" method="POST">
+          <div class="form-group">
+            <label for="edit_name_original" class="form-label">Original Name:</label>
+            <input type="text" id="edit_name_original" name="name_original" required class="form-input">
+          </div>
+          <div class="form-group">
+            <label for="edit_name_english" class="form-label">English Name (optional):</label>
+            <input type="text" id="edit_name_english" name="name_english" class="form-input">
+          </div>
+          <div class="form-group">
+            <label for="edit_source_url" class="form-label">Source URL:</label>
+            <input type="url" id="edit_source_url" name="source_url" required class="form-input">
+          </div>
+          <div class="form-group">
+            <label for="edit_thumbnail_url" class="form-label">Thumbnail URL:</label>
+            <input type="url" id="edit_thumbnail_url" name="thumbnail_url" required class="form-input">
+          </div>
+          <div class="form-group">
+            <label for="edit_category" class="form-label">Category (optional):</label>
+            <div class="fuzzy-search-container">
+              <input type="text" id="edit-category-search" class="form-input fuzzy-search" placeholder="Search for category..." autocomplete="off">
+              <div class="fuzzy-dropdown" id="edit-category-dropdown"></div>
+              <div class="selected-items" id="edit-selected-category"></div>
+              <input type="hidden" name="category_id" id="edit-category-id">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">
+              <input type="checkbox" name="is_cover" id="edit_is_cover" value="true"> Is Cover Version
+            </label>
+          </div>
+          <div class="form-group">
+            <label for="edit_artists" class="form-label">Artists:</label>
+            <div class="fuzzy-search-container">
+              <input type="text" id="edit-artists-search" class="form-input fuzzy-search" placeholder="Search for artists..." autocomplete="off">
+              <div class="fuzzy-dropdown" id="edit-artists-dropdown"></div>
+              <div class="selected-items" id="edit-selected-artists"></div>
+              <input type="hidden" name="artist_ids" id="edit-artist-ids">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="edit_units" class="form-label">Units (optional):</label>
+            <div class="fuzzy-search-container">
+              <input type="text" id="edit-units-search" class="form-input fuzzy-search" placeholder="Search for units..." autocomplete="off">
+              <div class="fuzzy-dropdown" id="edit-units-dropdown"></div>
+              <div class="selected-items" id="edit-selected-units"></div>
+              <input type="hidden" name="unit_ids" id="edit-unit-ids">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn-secondary" onclick="closeEditModal()">Cancel</button>
+            <button type="submit" class="btn-primary">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Delete Modal -->
+    <div id="deleteModal" class="modal" style="display: none">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Delete Song</h3>
+          <button type="button" class="modal-close" onclick="closeDeleteModal()">
+            &times;
+          </button>
+        </div>
+        <p>Are you sure you want to delete the song "<strong id="deleteSongName"></strong>"?</p>
+        <p style="color: var(--accent-danger)">This action cannot be undone.</p>
+        <div class="form-actions">
+          <button type="button" class="btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+          <form id="deleteForm" method="POST" style="display: inline">
+            <button type="submit" class="btn-danger">Delete Song</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <script src="/static/js/theme-toggle.js"></script>
+    <script src="/static/js/fuzzy-search.js"></script>
+    <script>
+      const categoriesData = JSON.parse('{{.categoriesJSON}}');
+      const artistsData = JSON.parse('{{.artistsJSON}}');
+      const unitsData = JSON.parse('{{.unitsJSON}}');
+      const songsData = JSON.parse('{{.songsJSON}}');
+
+      let currentSong = null;
+
+      function openEditModal(songId) {
+        currentSong = songsData.find(song => song.SongID === songId);
+        if (!currentSong) return;
+
+        // Populate basic fields
+        document.getElementById("edit_name_original").value = currentSong.NameOriginal || "";
+        document.getElementById("edit_name_english").value = currentSong.NameEnglish || "";
+        document.getElementById("edit_source_url").value = currentSong.SourceURL || "";
+        document.getElementById("edit_thumbnail_url").value = currentSong.ThumbnailURL || "";
+        document.getElementById("edit_is_cover").checked = currentSong.IsCover || false;
+
+        // Set form action
+        document.getElementById("editForm").action = "/admin/songs/" + songId + "/edit";
+
+        // Clear existing selections
+        document.getElementById("edit-selected-category").innerHTML = "";
+        document.getElementById("edit-selected-artists").innerHTML = "";
+        document.getElementById("edit-selected-units").innerHTML = "";
+        document.getElementById("edit-category-id").value = "";
+        document.getElementById("edit-artist-ids").value = "";
+        document.getElementById("edit-unit-ids").value = "";
+
+        // Populate category selection
+        if (currentSong.Category && currentSong.Category.CategoryID) {
+          const categoryContainer = document.getElementById("edit-selected-category");
+          const categoryHiddenInput = document.getElementById("edit-category-id");
+          categoryHiddenInput.value = currentSong.Category.CategoryID;
+
+          const categoryTag = document.createElement("div");
+          categoryTag.className = "selected-tag";
+          categoryTag.innerHTML = `
+            <span>${currentSong.Category.Name}</span>
+            <button type="button" class="remove-tag" onclick="removeCategorySelection()">×</button>
+          `;
+          categoryContainer.appendChild(categoryTag);
+        }
+
+        // Populate artist selections
+        if (currentSong.Artists && currentSong.Artists.length > 0) {
+          const artistContainer = document.getElementById("edit-selected-artists");
+          const artistHiddenInput = document.getElementById("edit-artist-ids");
+          const artistIds = currentSong.Artists.map((a) => a.ArtistID).join(",");
+          artistHiddenInput.value = artistIds;
+          artistContainer.innerHTML = "";
+        }
+
+        // Populate unit selections
+        if (currentSong.Units && currentSong.Units.length > 0) {
+          const unitContainer = document.getElementById("edit-selected-units");
+          const unitHiddenInput = document.getElementById("edit-unit-ids");
+          const unitIds = currentSong.Units.map((u) => u.UnitID).join(",");
+          unitHiddenInput.value = unitIds;
+          unitContainer.innerHTML = "";
+        }
+
+        // Setup fuzzy searches
+        setupFuzzySearch('edit-category-search', 'edit-category-dropdown', 'edit-selected-category', 'edit-category-id', categoriesData, 'CategoryID', 'Name', true);
+        setupFuzzySearch('edit-artists-search', 'edit-artists-dropdown', 'edit-selected-artists', 'edit-artist-ids', artistsData, 'ArtistID', 'NameOriginal');
+        setupFuzzySearch('edit-units-search', 'edit-units-dropdown', 'edit-selected-units', 'edit-unit-ids', unitsData, 'UnitID', 'NameOriginal');
+
+        document.getElementById("editModal").style.display = "flex";
+      }
+
+      function closeEditModal() {
+        document.getElementById("editModal").style.display = "none";
+      }
+
+      function deleteSong(id, name) {
+        document.getElementById("deleteSongName").textContent = name;
+        document.getElementById("deleteForm").action = "/admin/songs/" + id + "/delete";
+        document.getElementById("deleteModal").style.display = "flex";
+      }
+
+      function closeDeleteModal() {
+        document.getElementById("deleteModal").style.display = "none";
+      }
+
+      function removeCategorySelection() {
+        document.getElementById("edit-category-id").value = "";
+        document.getElementById("edit-selected-category").innerHTML = "";
+      }
+
+      // Close modals when clicking outside
+      window.onclick = function (event) {
+        const editModal = document.getElementById("editModal");
+        const deleteModal = document.getElementById("deleteModal");
+        if (event.target === editModal) {
+          closeEditModal();
+        }
+        if (event.target === deleteModal) {
+          closeDeleteModal();
+        }
+      };
+    </script>
+  </body>
+</html>
+{{end}}
