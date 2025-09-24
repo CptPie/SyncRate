@@ -1,0 +1,46 @@
+{{define "add-category.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.title}}</title>
+    <link href="/static/css/style.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        {{template "header" .}}
+        <main>
+            <div class="admin-header">
+                <h2>Add Category</h2>
+                <a href="/admin" class="btn-secondary">← Back to Admin</a>
+            </div>
+
+            <div class="form-container">
+                <form action="/admin/add-category" method="POST">
+                    <div class="form-group">
+                        <label for="name" class="form-label">Category Name:</label>
+                        <input type="text" id="name" name="name" required class="form-input" placeholder="e.g., J-Pop, K-Pop, Rock">
+                    </div>
+                    <button type="submit" class="btn-primary">Add Category</button>
+                </form>
+            </div>
+
+            {{if .categories}}
+            <div class="reference-section">
+                <h3>Existing Categories</h3>
+                <div class="reference-items">
+                    {{range .categories}}
+                    <div class="reference-item">
+                        <strong>{{.Name}}</strong>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+        </main>
+    </div>
+    <script src="/static/js/theme-toggle.js"></script>
+</body>
+</html>
+{{end}}

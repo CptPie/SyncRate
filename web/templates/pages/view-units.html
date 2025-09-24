@@ -1,0 +1,548 @@
+{{define "view-units.html"}}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{.title}}</title>
+    <link href="/static/css/style.css" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="container">
+      {{template "header" .}}
+      <main>
+        <div class="admin-header">
+          <h2>View Units</h2>
+          <a href="/admin" class="btn-secondary">← Back to Admin</a>
+        </div>
+
+        {{if .units}}
+        <div class="view-grid">
+          {{range .units}}
+          <div class="view-card">
+            <div class="view-card-header">
+              <h3>{{.NameOriginal}}</h3>
+              <div class="view-card-actions">
+                <button
+                  class="btn-secondary edit-btn"
+                  onclick="openEditModal({{.UnitID}})"
+                >
+                  Edit
+                </button>
+                <button
+                  class="btn-danger delete-btn"
+                  onclick="deleteUnit({{.UnitID}}, '{{.NameOriginal}}')"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+            <div class="view-card-details">
+              {{if .NameEnglish}}
+              <p><strong>English Name:</strong> {{.NameEnglish}}</p>
+              {{end}} {{if .Category}}
+              <p><strong>Category:</strong> {{.Category.Name}}</p>
+              {{end}} {{if .PrimaryColor}}
+              <p>
+                <strong>Primary Color:</strong>
+                <span
+                  class="color-preview"
+                  style="background: {{.PrimaryColor}}"
+                ></span>
+                {{.PrimaryColor}}
+              </p>
+              {{end}} {{if .SecondaryColor}}
+              <p>
+                <strong>Secondary Color:</strong>
+                <span
+                  class="color-preview"
+                  style="background: {{.SecondaryColor}}"
+                ></span>
+                {{.SecondaryColor}}
+              </p>
+              {{end}} {{if .Artists}}
+              <p><strong>Members:</strong></p>
+              <ul class="member-list">
+                {{range .Artists}}
+                <li>
+                  {{if .Artist}}{{.Artist.NameOriginal}}{{else}}Unknown
+                  Artist{{end}}
+                </li>
+                {{end}}
+              </ul>
+              {{end}}
+              <p><strong>ID:</strong> {{.UnitID}}</p>
+              <p>
+                <strong>Created:</strong>
+                {{.CreatedAt.Format "2006-01-02 15:04"}}
+              </p>
+              {{if ne .CreatedAt .UpdatedAt}}
+              <p>
+                <strong>Updated:</strong>
+                {{.UpdatedAt.Format "2006-01-02 15:04"}}
+              </p>
+              {{end}}
+            </div>
+          </div>
+          {{end}}
+        </div>
+        {{else}}
+        <div class="empty-state">
+          <p>No units found.</p>
+          <a href="/admin/add-unit" class="btn-primary">Add First Unit</a>
+        </div>
+        {{end}}
+      </main>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal" style="display: none">
+      <div class="modal-content large-modal">
+        <div class="modal-header">
+          <h3>Edit Unit</h3>
+          <button type="button" class="modal-close" onclick="closeEditModal()">
+            &times;
+          </button>
+        </div>
+        <form id="editForm" method="POST">
+          <div class="form-group">
+            <label for="edit_name_original" class="form-label"
+              >Unit Name (original):</label
+            >
+            <input
+              type="text"
+              id="edit_name_original"
+              name="name_original"
+              required
+              class="form-input"
+            />
+          </div>
+          <div class="form-group">
+            <label for="edit_name_english" class="form-label"
+              >Translated Name (optional):</label
+            >
+            <input
+              type="text"
+              id="edit_name_english"
+              name="name_english"
+              class="form-input"
+            />
+          </div>
+          <div class="form-group">
+            <label for="edit_primary_color" class="form-label"
+              >Primary Color (optional):</label
+            >
+            <div class="color-input-group">
+              <input
+                type="color"
+                id="edit_primary_color_picker"
+                class="color-picker"
+                value="#007bff"
+              />
+              <input
+                type="text"
+                id="edit_primary_color"
+                name="primary_color"
+                class="form-input color-text"
+                placeholder="#007bff"
+                pattern="^#[0-9A-Fa-f]{6}$"
+                maxlength="7"
+              />
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="edit_secondary_color" class="form-label"
+              >Secondary Color (optional):</label
+            >
+            <div class="color-input-group">
+              <input
+                type="color"
+                id="edit_secondary_color_picker"
+                class="color-picker"
+                value="#6c757d"
+              />
+              <input
+                type="text"
+                id="edit_secondary_color"
+                name="secondary_color"
+                class="form-input color-text"
+                placeholder="#6c757d"
+                pattern="^#[0-9A-Fa-f]{6}$"
+                maxlength="7"
+              />
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="edit_category" class="form-label"
+              >Category (optional):</label
+            >
+            <div class="fuzzy-search-container">
+              <input
+                type="text"
+                id="edit-category-search"
+                class="form-input fuzzy-search"
+                placeholder="Search for category..."
+                autocomplete="off"
+              />
+              <div class="fuzzy-dropdown" id="edit-category-dropdown"></div>
+              <div class="selected-items" id="edit-selected-category"></div>
+              <input type="hidden" name="category_id" id="edit-category-id" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="edit_artists" class="form-label"
+              >Unit Members (optional):</label
+            >
+            <div class="fuzzy-search-container">
+              <input
+                type="text"
+                id="edit-artists-search"
+                class="form-input fuzzy-search"
+                placeholder="Search for artists..."
+                autocomplete="off"
+              />
+              <div class="fuzzy-dropdown" id="edit-artists-dropdown"></div>
+              <div class="selected-items" id="edit-selected-artists"></div>
+              <input type="hidden" name="artist_ids" id="edit-artist-ids" />
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button
+              type="button"
+              class="btn-secondary"
+              onclick="closeEditModal()"
+            >
+              Cancel
+            </button>
+            <button type="submit" class="btn-primary">Update Unit</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="modal" style="display: none">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Delete Unit</h3>
+          <button
+            type="button"
+            class="modal-close"
+            onclick="closeDeleteModal()"
+          >
+            &times;
+          </button>
+        </div>
+        <div class="modal-body">
+          <p>
+            Are you sure you want to delete the unit "<span
+              id="deleteUnitName"
+            ></span
+            >"?
+          </p>
+          <p class="warning">This action cannot be undone.</p>
+        </div>
+        <div class="modal-actions">
+          <button
+            type="button"
+            class="btn-secondary"
+            onclick="closeDeleteModal()"
+          >
+            Cancel
+          </button>
+          <form id="deleteForm" method="POST" style="display: inline">
+            <button type="submit" class="btn-danger">Delete Unit</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <script src="/static/js/theme-toggle.js"></script>
+    <script src="/static/js/fuzzy-search.js"></script>
+    <script src="/static/js/color-sync.js"></script>
+    <script>
+      let currentUnit = null;
+      let selectedCategoryId = null;
+      let artistSearchInstance = null;
+      const categoriesData = JSON.parse("{{.categoriesJSON}}");
+      const artistsData = JSON.parse("{{.artistsJSON}}");
+
+      function openEditModal(unitId) {
+        // Find unit data
+        const units = JSON.parse("{{.unitsJSON}}");
+        currentUnit = units.find((u) => u.UnitID === unitId);
+
+        console.log(currentUnit);
+
+        if (currentUnit) {
+          // Clear previous selections
+          document.getElementById("edit-category-id").value = "";
+          document.getElementById("edit-artist-ids").value = "";
+          document.getElementById("edit-selected-category").innerHTML = "";
+          document.getElementById("edit-selected-artists").innerHTML = "";
+
+          // Populate form fields
+          document.getElementById("edit_name_original").value =
+            currentUnit.NameOriginal || "";
+          document.getElementById("edit_name_english").value =
+            currentUnit.NameEnglish || "";
+          document.getElementById("edit_primary_color").value =
+            currentUnit.PrimaryColor || "";
+          document.getElementById("edit_secondary_color").value =
+            currentUnit.SecondaryColor || "";
+
+          // Set color pickers
+          if (currentUnit.PrimaryColor) {
+            document.getElementById("edit_primary_color_picker").value =
+              currentUnit.PrimaryColor;
+          }
+          if (currentUnit.SecondaryColor) {
+            document.getElementById("edit_secondary_color_picker").value =
+              currentUnit.SecondaryColor;
+          }
+
+          // Set category and track for filtering
+          selectedCategoryId = null;
+          if (currentUnit.Category) {
+            selectedCategoryId = currentUnit.Category.CategoryID.toString();
+          }
+
+          document.getElementById("editForm").action =
+            "/admin/units/" + unitId + "/edit";
+
+          // Setup fuzzy search and color sync
+          setupEditFormFunctionality();
+
+          // After setup, populate existing selections
+          setTimeout(() => {
+            populateExistingSelections();
+          }, 50); // Small delay to ensure fuzzy search is initialized
+
+          document.getElementById("editModal").style.display = "flex";
+        }
+      }
+
+      function populateExistingSelections() {
+        // Populate category selection
+        if (currentUnit.Category) {
+          const categoryContainer = document.getElementById(
+            "edit-selected-category",
+          );
+          const categoryHiddenInput =
+            document.getElementById("edit-category-id");
+
+          categoryHiddenInput.value = currentUnit.Category.CategoryID;
+
+          const categoryTag = document.createElement("div");
+          categoryTag.className = "selected-tag";
+          categoryTag.innerHTML = `
+            <span>${currentUnit.Category.Name}</span>
+            <button type="button" class="remove-tag" onclick="removeCategorySelection()">×</button>
+          `;
+          categoryContainer.appendChild(categoryTag);
+        }
+
+        // Populate artist selections
+        if (currentUnit.Artists && currentUnit.Artists.length > 0) {
+          const artistContainer = document.getElementById(
+            "edit-selected-artists",
+          );
+          const artistHiddenInput = document.getElementById("edit-artist-ids");
+
+          const artistIds = currentUnit.Artists.map((a) => a.ArtistID).join(
+            ",",
+          );
+          artistHiddenInput.value = artistIds;
+
+          currentUnit.Artists.forEach((artistUnit, index) => {
+            if (artistUnit.Artist) {
+              const artistTag = document.createElement("div");
+              artistTag.className = "selected-tag";
+              artistTag.innerHTML = `
+                <span>${artistUnit.Artist.NameOriginal}</span>
+                <button type="button" class="remove-tag" onclick="removeArtistSelection(${artistUnit.ArtistID})">×</button>
+              `;
+              artistContainer.appendChild(artistTag);
+            }
+          });
+        }
+      }
+
+      function removeCategorySelection() {
+        document.getElementById("edit-category-id").value = "";
+        document.getElementById("edit-selected-category").innerHTML = "";
+        selectedCategoryId = null;
+        setupArtistSearch(); // Refresh artist search without category filter
+      }
+
+      function removeArtistSelection(artistIdToRemove) {
+        const artistHiddenInput = document.getElementById("edit-artist-ids");
+        const currentIds = artistHiddenInput.value
+          .split(",")
+          .filter((id) => id.trim() !== "");
+        const newIds = currentIds.filter(
+          (id) => parseInt(id) !== artistIdToRemove,
+        );
+        artistHiddenInput.value = newIds.join(",");
+
+        // Update currentUnit to reflect the removal
+        if (currentUnit.Artists) {
+          currentUnit.Artists = currentUnit.Artists.filter(
+            (a) => a.ArtistID !== artistIdToRemove,
+          );
+        }
+
+        // Refresh only the artist display
+        const artistContainer = document.getElementById(
+          "edit-selected-artists",
+        );
+        artistContainer.innerHTML = "";
+
+        if (currentUnit.Artists && currentUnit.Artists.length > 0) {
+          currentUnit.Artists.forEach((artistUnit) => {
+            if (artistUnit.Artist) {
+              const artistTag = document.createElement("div");
+              artistTag.className = "selected-tag";
+              artistTag.innerHTML = `
+                <span>${artistUnit.Artist.NameOriginal}</span>
+                <button type="button" class="remove-tag" onclick="removeArtistSelection(${artistUnit.ArtistID})">×</button>
+              `;
+              artistContainer.appendChild(artistTag);
+            }
+          });
+        }
+      }
+
+      // Function to filter artists based on selected category
+      function getFilteredArtists() {
+        if (!selectedCategoryId) {
+          return artistsData; // No category selected, show all artists
+        }
+        return artistsData.filter((artist) => {
+          return (
+            artist.CategoryID &&
+            artist.CategoryID.toString() === selectedCategoryId.toString()
+          );
+        });
+      }
+
+      // Setup artist search with current filtered data
+      function setupArtistSearch() {
+        const filteredArtists = getFilteredArtists();
+
+        // Clear existing search state
+        const artistInput = document.getElementById("edit-artists-search");
+        const artistDropdown = document.getElementById("edit-artists-dropdown");
+
+        if (artistInput) artistInput.value = "";
+        if (artistDropdown) artistDropdown.style.display = "none";
+
+        // Create new search instance with filtered data
+        setupFuzzySearch(
+          "edit-artists-search",
+          "edit-artists-dropdown",
+          "edit-selected-artists",
+          "edit-artist-ids",
+          filteredArtists,
+          "ArtistID",
+          "NameOriginal",
+        );
+
+        // Show feedback about filtering
+        const artistLabel = document.querySelector('label[for="edit_artists"]');
+        if (artistLabel && filteredArtists.length !== artistsData.length) {
+          artistLabel.textContent = `Unit Members (${filteredArtists.length} artists in selected category):`;
+        } else if (artistLabel) {
+          artistLabel.textContent = "Unit Members (optional):";
+        }
+      }
+
+      function setupEditFormFunctionality() {
+        // Initialize color picker synchronization
+        initializeColorSync([
+          {
+            pickerId: "edit_primary_color_picker",
+            textId: "edit_primary_color",
+          },
+          {
+            pickerId: "edit_secondary_color_picker",
+            textId: "edit_secondary_color",
+          },
+        ]);
+
+        // Setup fuzzy search for categories
+        setupFuzzySearch(
+          "edit-category-search",
+          "edit-category-dropdown",
+          "edit-selected-category",
+          "edit-category-id",
+          categoriesData,
+          "CategoryID",
+          "Name",
+          true, // single selection
+        );
+
+        // Monitor category selection changes
+        const categoryHiddenInput = document.getElementById("edit-category-id");
+        if (categoryHiddenInput) {
+          // Listen for value changes using a polling approach
+          let lastCategoryValue = categoryHiddenInput.value;
+
+          const categoryWatcher = setInterval(() => {
+            const currentValue = categoryHiddenInput.value;
+            if (currentValue !== lastCategoryValue) {
+              lastCategoryValue = currentValue;
+              selectedCategoryId = currentValue;
+              setupArtistSearch();
+            }
+          }, 100); // Check every 100ms
+
+          // Clear interval when modal closes
+          const modal = document.getElementById("editModal");
+          const observer = new MutationObserver(() => {
+            if (modal.style.display === "none") {
+              clearInterval(categoryWatcher);
+              observer.disconnect();
+            }
+          });
+          observer.observe(modal, {
+            attributes: true,
+            attributeFilter: ["style"],
+          });
+        }
+
+        // Initialize artist search
+        setupArtistSearch();
+      }
+
+      function closeEditModal() {
+        document.getElementById("editModal").style.display = "none";
+      }
+
+      function deleteUnit(id, name) {
+        document.getElementById("deleteUnitName").textContent = name;
+        document.getElementById("deleteForm").action =
+          "/admin/units/" + id + "/delete";
+        document.getElementById("deleteModal").style.display = "flex";
+      }
+
+      function closeDeleteModal() {
+        document.getElementById("deleteModal").style.display = "none";
+      }
+
+      // Close modals when clicking outside
+      window.onclick = function (event) {
+        const editModal = document.getElementById("editModal");
+        const deleteModal = document.getElementById("deleteModal");
+        if (event.target === editModal) {
+          closeEditModal();
+        }
+        if (event.target === deleteModal) {
+          closeDeleteModal();
+        }
+      };
+    </script>
+  </body>
+</html>
+{{end}}
+

@@ -1,0 +1,43 @@
+{{define "admin-index.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.title}}</title>
+    <link href="/static/css/style.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        {{template "header" .}}
+        <main>
+            <h2>Admin Panel</h2>
+            <p>Manage database entries</p>
+
+            <div class="admin-menu">
+                <div class="admin-menu-item">
+                    <h3>Add Entries</h3>
+                    <div class="admin-links">
+                        <a href="/admin/add-category" class="admin-link">Add Category</a>
+                        <a href="/admin/add-unit" class="admin-link">Add Unit</a>
+                        <a href="/admin/add-artist" class="admin-link">Add Artist</a>
+                        <a href="/admin/add-song" class="admin-link">Add Song</a>
+                    </div>
+                </div>
+
+                <div class="admin-menu-item">
+                    <h3>View Entries</h3>
+                    <div class="admin-links">
+                        <a href="/admin/categories" class="admin-link">View Categories ({{.categoryCount}})</a>
+                        <a href="/admin/units" class="admin-link">View Units ({{.unitCount}})</a>
+                        <a href="/admin/artists" class="admin-link">View Artists ({{.artistCount}})</a>
+                        <a href="/songs" class="admin-link">View Songs ({{.songCount}})</a>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="/static/js/theme-toggle.js"></script>
+</body>
+</html>
+{{end}}

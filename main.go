@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/CptPie/SyncRate/database"
+	"github.com/CptPie/SyncRate/server/router"
 )
 
 func main() {
@@ -28,4 +29,15 @@ func main() {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
+
+	// Start web server
+	r := router.SetupRouter(db.DB)
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Printf("Starting server on port %s", port)
+	log.Fatal(r.Run(":" + port))
 }

@@ -1,0 +1,52 @@
+{{define "home.html"}}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{.title}}</title>
+    <link href="/static/css/style.css" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="container">
+      {{template "header" .}}
+      <main>
+        <h2>Welcome to SyncRate</h2>
+        <p>Rate and discover music together</p>
+
+        {{if .songs}}
+        <div class="song-grid">
+          {{range .songs}}
+          <div class="song-card">
+            <h3>
+              <a
+                href="/songs/{{.SongID}}"
+                style="text-decoration: none; color: inherit"
+                >{{.NameOriginal}}</a
+              >
+            </h3>
+            {{if .NameEnglish}}
+            <p><em>{{.NameEnglish}}</em></p>
+            {{end}} {{if .Artists}}
+            <div class="artist">
+              {{range $index, $songArtist := .Artists}} {{if $index}},
+              {{end}}{{if
+              $songArtist.Artist}}{{$songArtist.Artist.NameOriginal}}{{else}}Unknown
+              Artist{{end}} {{end}}
+            </div>
+            {{end}} {{if .Category}}
+            <span class="category">{{.Category.Name}}</span>
+            {{end}}
+          </div>
+          {{end}}
+        </div>
+        {{else}}
+        <p>No songs available yet.</p>
+        {{end}}
+      </main>
+    </div>
+    <script src="/static/js/theme-toggle.js"></script>
+  </body>
+</html>
+{{end}}
+

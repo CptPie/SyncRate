@@ -1,0 +1,178 @@
+{{define "add-artist.html"}}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{.title}}</title>
+    <link href="/static/css/style.css" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="container">
+      {{template "header" .}}
+      <main>
+        <div class="admin-header">
+          <h2>Add Artist</h2>
+          <a href="/admin" class="btn-secondary">← Back to Admin</a>
+        </div>
+
+        <div class="form-container">
+          <form action="/admin/add-artist" method="POST">
+            <div class="form-group">
+              <label for="name_original" class="form-label"
+                >Artist Name (original):</label
+              >
+              <input
+                type="text"
+                id="name_original"
+                name="name_original"
+                required
+                class="form-input"
+                placeholder="..."
+              />
+            </div>
+            <div class="form-group">
+              <label for="name_english" class="form-label"
+                >Translated Name (optional):</label
+              >
+              <input
+                type="text"
+                id="name_english"
+                name="name_english"
+                class="form-input"
+                placeholder="..."
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="primary_color" class="form-label">Primary Color (optional):</label>
+              <div class="color-input-group">
+                <input
+                  type="color"
+                  id="primary_color_picker"
+                  class="color-picker"
+                  value="#007bff"
+                />
+                <input
+                  type="text"
+                  id="primary_color"
+                  name="primary_color"
+                  class="form-input color-text"
+                  placeholder="#007bff"
+                  pattern="^#[0-9A-Fa-f]{6}$"
+                  maxlength="7"
+                />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="secondary_color" class="form-label">Secondary Color (optional):</label>
+              <div class="color-input-group">
+                <input
+                  type="color"
+                  id="secondary_color_picker"
+                  class="color-picker"
+                  value="#6c757d"
+                />
+                <input
+                  type="text"
+                  id="secondary_color"
+                  name="secondary_color"
+                  class="form-input color-text"
+                  placeholder="#6c757d"
+                  pattern="^#[0-9A-Fa-f]{6}$"
+                  maxlength="7"
+                />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="category" class="form-label">Category (optional):</label>
+              <div class="fuzzy-search-container">
+                <input
+                  type="text"
+                  id="category-search"
+                  class="form-input fuzzy-search"
+                  placeholder="Search for category..."
+                  autocomplete="off"
+                />
+                <div class="fuzzy-dropdown" id="category-dropdown"></div>
+                <div class="selected-items" id="selected-category"></div>
+                <input type="hidden" name="category_id" id="category-id" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="units" class="form-label">Units (optional):</label>
+              <div class="fuzzy-search-container">
+                <input
+                  type="text"
+                  id="units-search"
+                  class="form-input fuzzy-search"
+                  placeholder="Search for units..."
+                  autocomplete="off"
+                />
+                <div class="fuzzy-dropdown" id="units-dropdown"></div>
+                <div class="selected-items" id="selected-units"></div>
+                <input type="hidden" name="unit_ids" id="unit-ids" />
+              </div>
+            </div>
+
+            <button type="submit" class="btn-primary">Add Artist</button>
+          </form>
+        </div>
+
+        {{if .artists}}
+        <div class="reference-section">
+          <h3>Existing Artists</h3>
+          <div class="reference-items">
+            {{range .artists}}
+            <div class="reference-item">
+              <strong>{{.NameOriginal}}</strong>
+              {{if .NameEnglish}}<em>({{.NameEnglish}})</em>{{end}}
+            </div>
+            {{end}}
+          </div>
+        </div>
+        {{end}}
+      </main>
+    </div>
+
+    <script src="/static/js/theme-toggle.js"></script>
+    <script src="/static/js/fuzzy-search.js"></script>
+    <script src="/static/js/color-sync.js"></script>
+    <script>
+      // Initialize color picker synchronization
+      initializeColorSync([
+        { pickerId: 'primary_color_picker', textId: 'primary_color' },
+        { pickerId: 'secondary_color_picker', textId: 'secondary_color' }
+      ]);
+
+      // Fuzzy search functionality for categories
+      const categoriesData = JSON.parse("{{.categoriesJSON}}");
+      setupFuzzySearch(
+        "category-search",
+        "category-dropdown",
+        "selected-category",
+        "category-id",
+        categoriesData,
+        "CategoryID",
+        "Name",
+        true // single selection
+      );
+
+      // Fuzzy search functionality for units
+      const unitsData = JSON.parse("{{.unitsJSON}}");
+      setupFuzzySearch(
+        "units-search",
+        "units-dropdown",
+        "selected-units",
+        "unit-ids",
+        unitsData,
+        "UnitID",
+        "NameOriginal",
+      );
+    </script>
+  </body>
+</html>
+{{end}}

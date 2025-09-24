@@ -1,0 +1,243 @@
+{{define "add-unit.html"}}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{.title}}</title>
+    <link href="/static/css/style.css" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="container">
+      {{template "header" .}}
+      <main>
+        <div class="admin-header">
+          <h2>Add Unit</h2>
+          <a href="/admin" class="btn-secondary">← Back to Admin</a>
+        </div>
+
+        <div class="form-container">
+          <form action="/admin/add-unit" method="POST">
+            <div class="form-group">
+              <label for="name_original" class="form-label"
+                >Unit Name (original):</label
+              >
+              <input
+                type="text"
+                id="name_original"
+                name="name_original"
+                required
+                class="form-input"
+                placeholder="..."
+              />
+            </div>
+            <div class="form-group">
+              <label for="name_english" class="form-label"
+                >Translated Name (optional):</label
+              >
+              <input
+                type="text"
+                id="name_english"
+                name="name_english"
+                class="form-input"
+                placeholder="..."
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="primary_color" class="form-label"
+                >Primary Color (optional):</label
+              >
+              <div class="color-input-group">
+                <input
+                  type="color"
+                  id="primary_color_picker"
+                  class="color-picker"
+                  value="#007bff"
+                />
+                <input
+                  type="text"
+                  id="primary_color"
+                  name="primary_color"
+                  class="form-input color-text"
+                  placeholder="#007bff"
+                  pattern="^#[0-9A-Fa-f]{6}$"
+                  maxlength="7"
+                />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="secondary_color" class="form-label"
+                >Secondary Color (optional):</label
+              >
+              <div class="color-input-group">
+                <input
+                  type="color"
+                  id="secondary_color_picker"
+                  class="color-picker"
+                  value="#6c757d"
+                />
+                <input
+                  type="text"
+                  id="secondary_color"
+                  name="secondary_color"
+                  class="form-input color-text"
+                  placeholder="#6c757d"
+                  pattern="^#[0-9A-Fa-f]{6}$"
+                  maxlength="7"
+                />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="category" class="form-label"
+                >Category (optional):</label
+              >
+              <div class="fuzzy-search-container">
+                <input
+                  type="text"
+                  id="category-search"
+                  class="form-input fuzzy-search"
+                  placeholder="Search for category..."
+                  autocomplete="off"
+                />
+                <div class="fuzzy-dropdown" id="category-dropdown"></div>
+                <div class="selected-items" id="selected-category"></div>
+                <input type="hidden" name="category_id" id="category-id" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="artists" class="form-label"
+                >Add Members (optional):</label
+              >
+              <div class="fuzzy-search-container">
+                <input
+                  type="text"
+                  id="artists-search"
+                  class="form-input fuzzy-search"
+                  placeholder="Search for artists..."
+                  autocomplete="off"
+                />
+                <div class="fuzzy-dropdown" id="artists-dropdown"></div>
+                <div class="selected-items" id="selected-artists"></div>
+                <input type="hidden" name="artist_ids" id="artist-ids" />
+              </div>
+            </div>
+
+            <button type="submit" class="btn-primary">Add Unit</button>
+          </form>
+        </div>
+
+        {{if .units}}
+        <div class="reference-section">
+          <h3>Existing Units</h3>
+          <div class="reference-items">
+            {{range .units}}
+            <div class="reference-item">
+              <strong>{{.NameOriginal}}</strong>
+              {{if .NameEnglish}}<em>({{.NameEnglish}})</em>{{end}}
+            </div>
+            {{end}}
+          </div>
+        </div>
+        {{end}}
+      </main>
+    </div>
+
+    <script src="/static/js/theme-toggle.js"></script>
+    <script src="/static/js/fuzzy-search.js"></script>
+    <script src="/static/js/color-sync.js"></script>
+    <script>
+      // Initialize color picker synchronization
+      initializeColorSync([
+        { pickerId: "primary_color_picker", textId: "primary_color" },
+        { pickerId: "secondary_color_picker", textId: "secondary_color" },
+      ]);
+
+      // Global data
+      const categoriesData = JSON.parse("{{.categoriesJSON}}");
+      const artistsData = JSON.parse("{{.artistsJSON}}");
+
+      let selectedCategoryId = null;
+
+      // Fuzzy search functionality for categories
+      setupFuzzySearch(
+        "category-search",
+        "category-dropdown",
+        "selected-category",
+        "category-id",
+        categoriesData,
+        "CategoryID",
+        "Name",
+        true, // single selection
+      );
+
+      // Function to filter artists based on selected category
+      function getFilteredArtists() {
+        if (!selectedCategoryId) {
+          return artistsData; // No category selected, show all artists
+        }
+        return artistsData.filter((artist) => {
+          return (
+            artist.CategoryID &&
+            artist.CategoryID.toString() === selectedCategoryId.toString()
+          );
+        });
+      }
+
+      // Setup artist search with current filtered data
+      function setupArtistSearch() {
+        const filteredArtists = getFilteredArtists();
+
+        // Clear existing search state
+        const artistInput = document.getElementById("artists-search");
+        const artistDropdown = document.getElementById("artists-dropdown");
+        const selectedArtists = document.getElementById("selected-artists");
+
+        if (artistInput) artistInput.value = "";
+        if (artistDropdown) artistDropdown.style.display = "none";
+
+        // Create new search instance with filtered data
+        setupFuzzySearch(
+          "artists-search",
+          "artists-dropdown",
+          "selected-artists",
+          "artist-ids",
+          filteredArtists,
+          "ArtistID",
+          "NameOriginal",
+        );
+
+        // Show feedback about filtering
+        const artistLabel = document.querySelector('label[for="artists"]');
+        if (artistLabel && filteredArtists.length !== artistsData.length) {
+          artistLabel.textContent = `Add Members (${filteredArtists.length} artists in selected category):`;
+        } else if (artistLabel) {
+          artistLabel.textContent = "Add Members (optional):";
+        }
+      }
+
+      // Monitor category selection changes
+      const categoryHiddenInput = document.getElementById("category-id");
+      if (categoryHiddenInput) {
+        // Listen for value changes using a polling approach since MutationObserver on value is unreliable
+        let lastCategoryValue = categoryHiddenInput.value;
+
+        setInterval(() => {
+          const currentValue = categoryHiddenInput.value;
+          if (currentValue !== lastCategoryValue) {
+            lastCategoryValue = currentValue;
+            selectedCategoryId = currentValue;
+            setupArtistSearch();
+          }
+        }, 100); // Check every 100ms
+      }
+
+      // Initialize artist search
+      setupArtistSearch();
+    </script>
+  </body>
+</html>
+{{end}}

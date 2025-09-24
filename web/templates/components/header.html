@@ -1,0 +1,27 @@
+{{define "header"}}
+<script>
+  // IMMEDIATE theme application to prevent flash - must run before any CSS
+  (function() {
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    if (savedTheme === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  })();
+</script>
+<header class="header">
+    <h1><a href="/" class="logo-link">SyncRate</a></h1>
+    <div class="header-right">
+        <nav class="nav">
+            <a href="/">Home</a>
+            <a href="/songs">Songs</a>
+            <a href="/admin">Admin</a>
+            <a href="/login">Login</a>
+            <a href="/register">Register</a>
+        </nav>
+        <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
+            <span class="theme-icon sun-icon">☀️</span>
+            <span class="theme-icon moon-icon">🌙</span>
+        </button>
+    </div>
+</header>
+{{end}}

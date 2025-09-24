@@ -1,0 +1,303 @@
+{{define "view-artists.html"}}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{.title}}</title>
+    <link href="/static/css/style.css" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="container">
+      {{template "header" .}}
+      <main>
+        <div class="admin-header">
+          <h2>View Artists</h2>
+          <a href="/admin" class="btn-secondary">← Back to Admin</a>
+        </div>
+
+        {{if .artists}}
+        <div class="view-grid">
+          {{range .artists}}
+          <div class="view-card">
+            <div class="view-card-header">
+              <h3>{{.NameOriginal}}</h3>
+              <div class="view-card-actions">
+                <button
+                  class="btn-secondary edit-btn"
+                  onclick="openEditModal({{.ArtistID}})"
+                >
+                  Edit
+                </button>
+                <button
+                  class="btn-danger delete-btn"
+                  onclick="deleteArtist({{.ArtistID}}, '{{.NameOriginal}}')"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+            <div class="view-card-details">
+              {{if .NameEnglish}}<p><strong>English Name:</strong> {{.NameEnglish}}</p>{{end}}
+              {{if .Category}}<p><strong>Category:</strong> {{.Category.Name}}</p>{{end}}
+              {{if .PrimaryColor}}<p><strong>Primary Color:</strong> <span class="color-preview" style="background: {{.PrimaryColor}}"></span> {{.PrimaryColor}}</p>{{end}}
+              {{if .SecondaryColor}}<p><strong>Secondary Color:</strong> <span class="color-preview" style="background: {{.SecondaryColor}}"></span> {{.SecondaryColor}}</p>{{end}}
+              {{if .Units}}
+              <p><strong>Units:</strong></p>
+              <ul class="member-list">
+                {{range .Units}}
+                <li>{{if .Unit}}{{.Unit.NameOriginal}}{{else}}Unknown Unit{{end}}</li>
+                {{end}}
+              </ul>
+              {{end}}
+              <p><strong>ID:</strong> {{.ArtistID}}</p>
+              <p><strong>Created:</strong> {{.CreatedAt.Format "2006-01-02 15:04"}}</p>
+              {{if ne .CreatedAt .UpdatedAt}}
+              <p><strong>Updated:</strong> {{.UpdatedAt.Format "2006-01-02 15:04"}}</p>
+              {{end}}
+            </div>
+          </div>
+          {{end}}
+        </div>
+        {{else}}
+        <div class="empty-state">
+          <p>No artists found.</p>
+          <a href="/admin/add-artist" class="btn-primary">Add First Artist</a>
+        </div>
+        {{end}}
+      </main>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal" style="display: none;">
+      <div class="modal-content large-modal">
+        <div class="modal-header">
+          <h3>Edit Artist</h3>
+          <button type="button" class="modal-close" onclick="closeEditModal()">&times;</button>
+        </div>
+        <form id="editForm" method="POST">
+          <div class="form-group">
+            <label for="edit_name_original" class="form-label">Artist Name (original):</label>
+            <input
+              type="text"
+              id="edit_name_original"
+              name="name_original"
+              required
+              class="form-input"
+            />
+          </div>
+          <div class="form-group">
+            <label for="edit_name_english" class="form-label">Translated Name (optional):</label>
+            <input
+              type="text"
+              id="edit_name_english"
+              name="name_english"
+              class="form-input"
+            />
+          </div>
+          <div class="form-group">
+            <label for="edit_primary_color" class="form-label">Primary Color (optional):</label>
+            <div class="color-input-group">
+              <input
+                type="color"
+                id="edit_primary_color_picker"
+                class="color-picker"
+                value="#007bff"
+              />
+              <input
+                type="text"
+                id="edit_primary_color"
+                name="primary_color"
+                class="form-input color-text"
+                placeholder="#007bff"
+                pattern="^#[0-9A-Fa-f]{6}$"
+                maxlength="7"
+              />
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="edit_secondary_color" class="form-label">Secondary Color (optional):</label>
+            <div class="color-input-group">
+              <input
+                type="color"
+                id="edit_secondary_color_picker"
+                class="color-picker"
+                value="#6c757d"
+              />
+              <input
+                type="text"
+                id="edit_secondary_color"
+                name="secondary_color"
+                class="form-input color-text"
+                placeholder="#6c757d"
+                pattern="^#[0-9A-Fa-f]{6}$"
+                maxlength="7"
+              />
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="edit_category" class="form-label">Category (optional):</label>
+            <div class="fuzzy-search-container">
+              <input
+                type="text"
+                id="edit-category-search"
+                class="form-input fuzzy-search"
+                placeholder="Search for category..."
+                autocomplete="off"
+              />
+              <div class="fuzzy-dropdown" id="edit-category-dropdown"></div>
+              <div class="selected-items" id="edit-selected-category"></div>
+              <input type="hidden" name="category_id" id="edit-category-id" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="edit_units" class="form-label">Units (optional):</label>
+            <div class="fuzzy-search-container">
+              <input
+                type="text"
+                id="edit-units-search"
+                class="form-input fuzzy-search"
+                placeholder="Search for units..."
+                autocomplete="off"
+              />
+              <div class="fuzzy-dropdown" id="edit-units-dropdown"></div>
+              <div class="selected-items" id="edit-selected-units"></div>
+              <input type="hidden" name="unit_ids" id="edit-unit-ids" />
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" onclick="closeEditModal()">Cancel</button>
+            <button type="submit" class="btn-primary">Update Artist</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="modal" style="display: none;">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Delete Artist</h3>
+          <button type="button" class="modal-close" onclick="closeDeleteModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure you want to delete the artist "<span id="deleteArtistName"></span>"?</p>
+          <p class="warning">This action cannot be undone.</p>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+          <form id="deleteForm" method="POST" style="display: inline;">
+            <button type="submit" class="btn-danger">Delete Artist</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <script src="/static/js/theme-toggle.js"></script>
+    <script src="/static/js/fuzzy-search.js"></script>
+    <script src="/static/js/color-sync.js"></script>
+    <script>
+      let currentArtist = null;
+      const categoriesData = JSON.parse("{{.categoriesJSON}}");
+      const unitsData = JSON.parse("{{.unitsJSON}}");
+
+      function openEditModal(artistId) {
+        // Find artist data
+        const artists = JSON.parse("{{.artistsJSON}}");
+        currentArtist = artists.find(a => a.ArtistID === artistId);
+
+        if (currentArtist) {
+          // Populate form fields
+          document.getElementById('edit_name_original').value = currentArtist.NameOriginal || '';
+          document.getElementById('edit_name_english').value = currentArtist.NameEnglish || '';
+          document.getElementById('edit_primary_color').value = currentArtist.PrimaryColor || '';
+          document.getElementById('edit_secondary_color').value = currentArtist.SecondaryColor || '';
+
+          // Set color pickers
+          if (currentArtist.PrimaryColor) {
+            document.getElementById('edit_primary_color_picker').value = currentArtist.PrimaryColor;
+          }
+          if (currentArtist.SecondaryColor) {
+            document.getElementById('edit_secondary_color_picker').value = currentArtist.SecondaryColor;
+          }
+
+          // Set category
+          if (currentArtist.Category) {
+            document.getElementById('edit-category-id').value = currentArtist.Category.CategoryID;
+          }
+
+          // Set units
+          if (currentArtist.Units && currentArtist.Units.length > 0) {
+            const unitIds = currentArtist.Units.map(u => u.UnitID).join(',');
+            document.getElementById('edit-unit-ids').value = unitIds;
+          }
+
+          document.getElementById('editForm').action = '/admin/artists/' + artistId + '/edit';
+
+          // Setup fuzzy search and color sync
+          setupEditFormFunctionality();
+
+          document.getElementById('editModal').style.display = 'flex';
+        }
+      }
+
+      function setupEditFormFunctionality() {
+        // Initialize color picker synchronization
+        initializeColorSync([
+          { pickerId: 'edit_primary_color_picker', textId: 'edit_primary_color' },
+          { pickerId: 'edit_secondary_color_picker', textId: 'edit_secondary_color' }
+        ]);
+
+        // Setup fuzzy search for categories
+        setupFuzzySearch(
+          "edit-category-search",
+          "edit-category-dropdown",
+          "edit-selected-category",
+          "edit-category-id",
+          categoriesData,
+          "CategoryID",
+          "Name",
+          true // single selection
+        );
+
+        // Setup fuzzy search for units
+        setupFuzzySearch(
+          "edit-units-search",
+          "edit-units-dropdown",
+          "edit-selected-units",
+          "edit-unit-ids",
+          unitsData,
+          "UnitID",
+          "NameOriginal"
+        );
+      }
+
+      function closeEditModal() {
+        document.getElementById('editModal').style.display = 'none';
+      }
+
+      function deleteArtist(id, name) {
+        document.getElementById('deleteArtistName').textContent = name;
+        document.getElementById('deleteForm').action = '/admin/artists/' + id + '/delete';
+        document.getElementById('deleteModal').style.display = 'flex';
+      }
+
+      function closeDeleteModal() {
+        document.getElementById('deleteModal').style.display = 'none';
+      }
+
+      // Close modals when clicking outside
+      window.onclick = function(event) {
+        const editModal = document.getElementById('editModal');
+        const deleteModal = document.getElementById('deleteModal');
+        if (event.target === editModal) {
+          closeEditModal();
+        }
+        if (event.target === deleteModal) {
+          closeDeleteModal();
+        }
+      }
+    </script>
+  </body>
+</html>
+{{end}}

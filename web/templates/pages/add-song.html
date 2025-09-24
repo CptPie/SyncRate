@@ -1,0 +1,94 @@
+{{define "add-song.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.title}}</title>
+    <link href="/static/css/style.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        {{template "header" .}}
+        <main>
+            <div class="admin-header">
+                <h2>Add Song</h2>
+                <a href="/admin" class="btn-secondary">← Back to Admin</a>
+            </div>
+
+            <div class="form-container">
+                <form action="/admin/add-song" method="POST">
+                    <div class="form-group">
+                        <label for="name_original" class="form-label">Original Name:</label>
+                        <input type="text" id="name_original" name="name_original" required class="form-input" placeholder="e.g., 君の名は。, Dynamite">
+                    </div>
+                    <div class="form-group">
+                        <label for="name_english" class="form-label">English Name (optional):</label>
+                        <input type="text" id="name_english" name="name_english" class="form-input" placeholder="e.g., Your Name, Dynamite">
+                    </div>
+                    <div class="form-group">
+                        <label for="source_url" class="form-label">Source URL:</label>
+                        <input type="url" id="source_url" name="source_url" required class="form-input" placeholder="https://youtube.com/watch?v=...">
+                    </div>
+                    <div class="form-group">
+                        <label for="thumbnail_url" class="form-label">Thumbnail URL (optional for YouTube):</label>
+                        <input type="url" id="thumbnail_url" name="thumbnail_url" class="form-input" placeholder="Auto-filled for YouTube URLs">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="category" class="form-label">Category (optional):</label>
+                        <div class="fuzzy-search-container">
+                            <input type="text" id="category-search" class="form-input fuzzy-search" placeholder="Search for category..." autocomplete="off">
+                            <div class="fuzzy-dropdown" id="category-dropdown"></div>
+                            <div class="selected-items" id="selected-category"></div>
+                            <input type="hidden" name="category_id" id="category-id">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            <input type="checkbox" name="is_cover" value="true"> Is Cover Version
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="artists" class="form-label">Artists:</label>
+                        <div class="fuzzy-search-container">
+                            <input type="text" id="artists-search" class="form-input fuzzy-search" placeholder="Search for artists..." autocomplete="off">
+                            <div class="fuzzy-dropdown" id="artists-dropdown"></div>
+                            <div class="selected-items" id="selected-artists"></div>
+                            <input type="hidden" name="artist_ids" id="artist-ids">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="units" class="form-label">Units (optional):</label>
+                        <div class="fuzzy-search-container">
+                            <input type="text" id="units-search" class="form-input fuzzy-search" placeholder="Search for units..." autocomplete="off">
+                            <div class="fuzzy-dropdown" id="units-dropdown"></div>
+                            <div class="selected-items" id="selected-units"></div>
+                            <input type="hidden" name="unit_ids" id="unit-ids">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-primary">Add Song</button>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/theme-toggle.js"></script>
+    <script src="/static/js/fuzzy-search.js"></script>
+    <script>
+        // Fuzzy search functionality
+        const categoriesData = JSON.parse('{{.categoriesJSON}}');
+        const artistsData = JSON.parse('{{.artistsJSON}}');
+        const unitsData = JSON.parse('{{.unitsJSON}}');
+
+        setupFuzzySearch('category-search', 'category-dropdown', 'selected-category', 'category-id', categoriesData, 'CategoryID', 'Name', true);
+        setupFuzzySearch('artists-search', 'artists-dropdown', 'selected-artists', 'artist-ids', artistsData, 'ArtistID', 'NameOriginal');
+        setupFuzzySearch('units-search', 'units-dropdown', 'selected-units', 'unit-ids', unitsData, 'UnitID', 'NameOriginal');
+    </script>
+</body>
+</html>
+{{end}}

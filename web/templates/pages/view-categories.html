@@ -1,0 +1,141 @@
+{{define "view-categories.html"}}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{.title}}</title>
+    <link href="/static/css/style.css" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="container">
+      {{template "header" .}}
+      <main>
+        <div class="admin-header">
+          <h2>View Categories</h2>
+          <a href="/admin" class="btn-secondary">← Back to Admin</a>
+        </div>
+
+        {{if .categories}}
+        <div class="view-grid">
+          {{range .categories}}
+          <div class="view-card">
+            <div class="view-card-header">
+              <h3>{{.Name}}</h3>
+              <div class="view-card-actions">
+                <button
+                  class="btn-secondary edit-btn"
+                  onclick="openEditModal({{.CategoryID}}, '{{.Name}}')"
+                >
+                  Edit
+                </button>
+                <button
+                  class="btn-danger delete-btn"
+                  onclick="deleteCategory({{.CategoryID}}, '{{.Name}}')"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+            <div class="view-card-details">
+              <p><strong>ID:</strong> {{.CategoryID}}</p>
+              <p><strong>Created:</strong> {{.CreatedAt.Format "2006-01-02 15:04"}}</p>
+              {{if ne .CreatedAt .UpdatedAt}}
+              <p><strong>Updated:</strong> {{.UpdatedAt.Format "2006-01-02 15:04"}}</p>
+              {{end}}
+            </div>
+          </div>
+          {{end}}
+        </div>
+        {{else}}
+        <div class="empty-state">
+          <p>No categories found.</p>
+          <a href="/admin/add-category" class="btn-primary">Add First Category</a>
+        </div>
+        {{end}}
+      </main>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal" style="display: none;">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Edit Category</h3>
+          <button type="button" class="modal-close" onclick="closeEditModal()">&times;</button>
+        </div>
+        <form id="editForm" method="POST">
+          <div class="form-group">
+            <label for="edit_name" class="form-label">Category Name:</label>
+            <input
+              type="text"
+              id="edit_name"
+              name="name"
+              required
+              class="form-input"
+            />
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" onclick="closeEditModal()">Cancel</button>
+            <button type="submit" class="btn-primary">Update Category</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="modal" style="display: none;">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Delete Category</h3>
+          <button type="button" class="modal-close" onclick="closeDeleteModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure you want to delete the category "<span id="deleteCategoryName"></span>"?</p>
+          <p class="warning">This action cannot be undone.</p>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+          <form id="deleteForm" method="POST" style="display: inline;">
+            <button type="submit" class="btn-danger">Delete Category</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <script src="/static/js/theme-toggle.js"></script>
+    <script>
+      function openEditModal(id, name) {
+        document.getElementById('edit_name').value = name;
+        document.getElementById('editForm').action = '/admin/categories/' + id + '/edit';
+        document.getElementById('editModal').style.display = 'flex';
+      }
+
+      function closeEditModal() {
+        document.getElementById('editModal').style.display = 'none';
+      }
+
+      function deleteCategory(id, name) {
+        document.getElementById('deleteCategoryName').textContent = name;
+        document.getElementById('deleteForm').action = '/admin/categories/' + id + '/delete';
+        document.getElementById('deleteModal').style.display = 'flex';
+      }
+
+      function closeDeleteModal() {
+        document.getElementById('deleteModal').style.display = 'none';
+      }
+
+      // Close modals when clicking outside
+      window.onclick = function(event) {
+        const editModal = document.getElementById('editModal');
+        const deleteModal = document.getElementById('deleteModal');
+        if (event.target === editModal) {
+          closeEditModal();
+        }
+        if (event.target === deleteModal) {
+          closeDeleteModal();
+        }
+      }
+    </script>
+  </body>
+</html>
+{{end}}
