@@ -11,9 +11,10 @@ type Song struct {
 	CategoryID   *uint
 	Category     *Category    `gorm:"foreignKey:CategoryID;references:CategoryID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
 	IsCover      bool
-	Units        []SongUnit   `gorm:"foreignKey:SongID"`
-	Artists      []SongArtist `gorm:"foreignKey:SongID"`
-	Albums       []AlbumSong  `gorm:"foreignKey:SongID"`
+	Units        []Unit   `gorm:"many2many:song_units;joinForeignKey:SongID;joinReferences:UnitID"`
+	Artists      []Artist `gorm:"many2many:song_artists;joinForeignKey:SongID;joinReferences:ArtistID"`
+	Albums       []Album  `gorm:"many2many:album_songs;joinForeignKey:SongID;joinReferences:AlbumID"`
+	Votes        []Vote       `gorm:"foreignKey:SongID;references:SongID"`
 
 	CreatedAt time.Time
 	UpdatedAt time.Time

@@ -10,7 +10,7 @@ type Album struct {
 	Type         string `gorm:"size:20;check:type IN ('Album','Single','EP')"`
 	CategoryID   *uint
 	Category     *Category `gorm:"foreignKey:CategoryID;references:CategoryID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
-	Songs        []AlbumSong `gorm:"foreignKey:AlbumID"`
+	Songs        []Song `gorm:"many2many:album_songs;joinForeignKey:AlbumID;joinReferences:SongID"`
 
 	CreatedAt time.Time
 	UpdatedAt time.Time

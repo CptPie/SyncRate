@@ -5,12 +5,11 @@ import (
 )
 
 type Vote struct {
-	UserID  uint `gorm:"primaryKey"`
-	SongID  uint `gorm:"primaryKey"`
+	VoteID  uint `gorm:"primaryKey"`
+	UserID  uint `gorm:"uniqueIndex:idx_user_song,priority:1"`
+	SongID  uint `gorm:"uniqueIndex:idx_user_song,priority:2"`
 	Rating  int  `gorm:"check:rating >= 1 AND rating <= 10"`
 	Comment string
-	User    User `gorm:"foreignKey:UserID;references:UserID"`
-	Song    Song `gorm:"foreignKey:SongID;references:SongID"`
 
 	CreatedAt time.Time
 	UpdatedAt time.Time

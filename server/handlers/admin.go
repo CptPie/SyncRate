@@ -313,7 +313,7 @@ func GetViewUnits(db *gorm.DB) gin.HandlerFunc {
 		var units []models.Unit
 		var categories []models.Category
 		var artists []models.Artist
-		db.Preload("Category").Preload("Artists.Artist").Find(&units)
+		db.Preload("Category").Preload("Artists").Find(&units)
 		db.Find(&categories)
 		db.Preload("Category").Find(&artists)
 
