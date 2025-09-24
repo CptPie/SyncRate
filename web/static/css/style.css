@@ -490,26 +490,27 @@ h2 {
   top: 100%;
   left: 0;
   right: 0;
-  background: white;
-  border: 1px solid #ddd;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
   border-top: none;
   border-radius: 0 0 4px 4px;
   max-height: 200px;
   overflow-y: auto;
   z-index: 1000;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px var(--shadow-light);
 }
 
 .fuzzy-option {
   padding: 10px 15px;
   cursor: pointer;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-light);
+  color: var(--text-primary);
 }
 
 .fuzzy-option:hover,
 .fuzzy-option.active {
-  background: #007bff;
-  color: white;
+  background: var(--accent-primary);
+  color: var(--text-inverse);
 }
 
 .fuzzy-option:last-child {
@@ -527,8 +528,8 @@ h2 {
 .selected-tag {
   display: inline-flex;
   align-items: center;
-  background: #007bff;
-  color: white;
+  background: var(--accent-primary);
+  color: var(--text-inverse);
   padding: 4px 8px;
   border-radius: 16px;
   font-size: 14px;
@@ -539,7 +540,7 @@ h2 {
 .remove-tag {
   background: none;
   border: none;
-  color: white;
+  color: var(--text-inverse);
   cursor: pointer;
   font-size: 16px;
   line-height: 1;

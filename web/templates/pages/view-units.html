@@ -64,10 +64,7 @@
               <p><strong>Members:</strong></p>
               <ul class="member-list">
                 {{range .Artists}}
-                <li>
-                  {{if .Artist}}{{.Artist.NameOriginal}}{{else}}Unknown
-                  Artist{{end}}
-                </li>
+                <li>{{.NameOriginal}}</li>
                 {{end}}
               </ul>
               {{end}}
@@ -354,17 +351,8 @@
           );
           artistHiddenInput.value = artistIds;
 
-          currentUnit.Artists.forEach((artistUnit, index) => {
-            if (artistUnit.Artist) {
-              const artistTag = document.createElement("div");
-              artistTag.className = "selected-tag";
-              artistTag.innerHTML = `
-                <span>${artistUnit.Artist.NameOriginal}</span>
-                <button type="button" class="remove-tag" onclick="removeArtistSelection(${artistUnit.ArtistID})">×</button>
-              `;
-              artistContainer.appendChild(artistTag);
-            }
-          });
+          // Clear any existing tags - fuzzy search will handle rendering
+          artistContainer.innerHTML = "";
         }
       }
 
@@ -375,43 +363,6 @@
         setupArtistSearch(); // Refresh artist search without category filter
       }
 
-      function removeArtistSelection(artistIdToRemove) {
-        const artistHiddenInput = document.getElementById("edit-artist-ids");
-        const currentIds = artistHiddenInput.value
-          .split(",")
-          .filter((id) => id.trim() !== "");
-        const newIds = currentIds.filter(
-          (id) => parseInt(id) !== artistIdToRemove,
-        );
-        artistHiddenInput.value = newIds.join(",");
-
-        // Update currentUnit to reflect the removal
-        if (currentUnit.Artists) {
-          currentUnit.Artists = currentUnit.Artists.filter(
-            (a) => a.ArtistID !== artistIdToRemove,
-          );
-        }
-
-        // Refresh only the artist display
-        const artistContainer = document.getElementById(
-          "edit-selected-artists",
-        );
-        artistContainer.innerHTML = "";
-
-        if (currentUnit.Artists && currentUnit.Artists.length > 0) {
-          currentUnit.Artists.forEach((artistUnit) => {
-            if (artistUnit.Artist) {
-              const artistTag = document.createElement("div");
-              artistTag.className = "selected-tag";
-              artistTag.innerHTML = `
-                <span>${artistUnit.Artist.NameOriginal}</span>
-                <button type="button" class="remove-tag" onclick="removeArtistSelection(${artistUnit.ArtistID})">×</button>
-              `;
-              artistContainer.appendChild(artistTag);
-            }
-          });
-        }
-      }
 
       // Function to filter artists based on selected category
       function getFilteredArtists() {
@@ -545,4 +496,3 @@
   </body>
 </html>
 {{end}}
-

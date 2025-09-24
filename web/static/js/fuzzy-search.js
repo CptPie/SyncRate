@@ -5,7 +5,20 @@ function setupFuzzySearch(inputId, dropdownId, selectedId, hiddenInputId, data, 
     const selectedContainer = document.getElementById(selectedId);
     const hiddenInput = document.getElementById(hiddenInputId);
 
+    // Initialize selectedItems from existing hidden input value
     let selectedItems = [];
+    if (hiddenInput.value) {
+        const existingIds = hiddenInput.value.split(',').filter(id => id.trim());
+        existingIds.forEach(id => {
+            const item = data.find(dataItem => dataItem[idField].toString() === id.trim());
+            if (item) {
+                selectedItems.push({
+                    id: item[idField],
+                    name: item[nameField]
+                });
+            }
+        });
+    }
 
     function updateHiddenInput() {
         if (singleSelect) {
@@ -184,4 +197,7 @@ function setupFuzzySearch(inputId, dropdownId, selectedId, hiddenInputId, data, 
                 break;
         }
     });
+
+    // Render any existing selections on initialization
+    renderSelectedItems();
 }
