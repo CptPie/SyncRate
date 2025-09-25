@@ -3,6 +3,103 @@
 /* Google Fonts Import */
 @import url("https://fonts.googleapis.com/css2?family=League+Spartan:wght@300;400;500;600;700&family=SUSE+Mono:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800&display=swap");
 
+/* Avenir Font Faces */
+@font-face {
+  font-family: "Avenir";
+  src: url("/static/fonts/Avenir Font Family/AvenirLTStd-Light.otf")
+    format("opentype");
+  font-weight: 300;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Avenir";
+  src: url("/static/fonts/Avenir Font Family/AvenirLTStd-LightOblique.otf")
+    format("opentype");
+  font-weight: 300;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "Avenir";
+  src: url("/static/fonts/Avenir Font Family/AvenirLTStd-Roman.otf")
+    format("opentype");
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Avenir";
+  src: url("/static/fonts/Avenir Font Family/AvenirLTStd-Oblique.otf")
+    format("opentype");
+  font-weight: 400;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "Avenir";
+  src: url("/static/fonts/Avenir Font Family/AvenirLTStd-Book.otf")
+    format("opentype");
+  font-weight: 450;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Avenir";
+  src: url("/static/fonts/Avenir Font Family/AvenirLTStd-BookOblique.otf")
+    format("opentype");
+  font-weight: 450;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "Avenir";
+  src: url("/static/fonts/Avenir Font Family/AvenirLTStd-Medium.otf")
+    format("opentype");
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Avenir";
+  src: url("/static/fonts/Avenir Font Family/AvenirLTStd-MediumOblique.otf")
+    format("opentype");
+  font-weight: 500;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "Avenir";
+  src: url("/static/fonts/Avenir Font Family/AvenirLTStd-Heavy.otf")
+    format("opentype");
+  font-weight: 700;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Avenir";
+  src: url("/static/fonts/Avenir Font Family/AvenirLTStd-HeavyOblique.otf")
+    format("opentype");
+  font-weight: 700;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "Avenir";
+  src: url("/static/fonts/Avenir Font Family/AvenirLTStd-Black.otf")
+    format("opentype");
+  font-weight: 900;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Avenir";
+  src: url("/static/fonts/Avenir Font Family/AvenirLTStd-BlackOblique.otf")
+    format("opentype");
+  font-weight: 900;
+  font-style: italic;
+}
+
 /* CSS Custom Properties for Theme Colors - Nord Palette */
 :root {
   /* Light theme colors - Nord Snow Storm & Polar Night */
@@ -60,7 +157,7 @@
 
 /* Base layout */
 body {
-  font-family: "Fredoka", Arial, sans-serif;
+  font-family: "Avenir", "Fredoka", sans-serif;
   font-weight: 400;
   margin: 0;
   padding: 20px;
@@ -550,7 +647,7 @@ h2 {
 
 /* Ensure filter group has matching height */
 .filter-group::after {
-  content: '';
+  content: "";
   display: block;
   height: 24px; /* Match search-stats height + margin */
 }
@@ -981,4 +1078,3 @@ h2 {
     grid-template-columns: 1fr;
   }
 }
-
