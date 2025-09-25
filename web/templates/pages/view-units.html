@@ -16,10 +16,33 @@
           <a href="/admin" class="btn-secondary">← Back to Admin</a>
         </div>
 
+        <!-- Search and Filter -->
+        <div class="search-filter-container">
+          <div class="search-filter-row">
+            <div class="search-group">
+              <label for="unit-search" class="form-label">Search Units</label>
+              <input type="text" id="unit-search" class="search-input" placeholder="Search by unit name or artist name...">
+              <div class="search-stats" id="search-stats">{{len .units}} units total</div>
+            </div>
+            <div class="filter-group">
+              <label for="category-filter" class="form-label">Filter by Category</label>
+              <select id="category-filter" class="filter-select">
+                <option value="">All Categories</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- No Results Message -->
+        <div id="no-results" class="no-results" style="display: none;">
+          <h3>No units found</h3>
+          <p>Try adjusting your search terms or filters</p>
+        </div>
+
         {{if .units}}
-        <div class="view-grid">
+        <div class="view-grid" id="units-container">
           {{range .units}}
-          <div class="view-card">
+          <div class="view-card" data-id="{{.UnitID}}">
             <div class="view-card-header">
               <h3>{{.NameOriginal}}</h3>
               <div class="view-card-actions">
@@ -257,6 +280,7 @@
     <script src="/static/js/theme-toggle.js"></script>
     <script src="/static/js/fuzzy-search.js"></script>
     <script src="/static/js/color-sync.js"></script>
+    <script src="/static/js/search-filter.js"></script>
     <script>
       let currentUnit = null;
       let selectedCategoryId = null;
@@ -491,6 +515,44 @@
         if (event.target === deleteModal) {
           closeDeleteModal();
         }
+      };
+
+      // Initialize search and filter functionality
+      const unitsData = JSON.parse("{{.unitsJSON}}");
+      const searchFilter = new FuzzySearchFilter({
+        searchInputId: 'unit-search',
+        categoryFilterId: 'category-filter',
+        itemsContainerId: 'units-container',
+        itemClass: 'view-card',
+        noResultsId: 'no-results',
+        data: unitsData,
+        categoriesData: categoriesData,
+        searchFields: [
+          'NameOriginal',
+          'NameEnglish',
+          'Artists'  // Will search in Artists array
+        ],
+        fuzzyThreshold: 15
+      });
+
+      // Update search stats
+      function updateSearchStats() {
+        const stats = document.getElementById('search-stats');
+        const totalCount = unitsData.length;
+        const filteredCount = searchFilter.filteredData.length;
+
+        if (filteredCount === totalCount) {
+          stats.textContent = `${totalCount} units total`;
+        } else {
+          stats.textContent = `${filteredCount} of ${totalCount} units`;
+        }
+      }
+
+      // Override the renderItems method to also update stats
+      const originalRenderItems = searchFilter.renderItems.bind(searchFilter);
+      searchFilter.renderItems = function() {
+        originalRenderItems();
+        updateSearchStats();
       };
     </script>
   </body>

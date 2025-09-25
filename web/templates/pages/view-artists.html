@@ -16,10 +16,33 @@
           <a href="/admin" class="btn-secondary">← Back to Admin</a>
         </div>
 
+        <!-- Search and Filter -->
+        <div class="search-filter-container">
+          <div class="search-filter-row">
+            <div class="search-group">
+              <label for="artist-search" class="form-label">Search Artists</label>
+              <input type="text" id="artist-search" class="search-input" placeholder="Search by artist name or unit...">
+              <div class="search-stats" id="search-stats">{{len .artists}} artists total</div>
+            </div>
+            <div class="filter-group">
+              <label for="category-filter" class="form-label">Filter by Category</label>
+              <select id="category-filter" class="filter-select">
+                <option value="">All Categories</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- No Results Message -->
+        <div id="no-results" class="no-results" style="display: none;">
+          <h3>No artists found</h3>
+          <p>Try adjusting your search terms or filters</p>
+        </div>
+
         {{if .artists}}
-        <div class="view-grid">
+        <div class="view-grid" id="artists-container">
           {{range .artists}}
-          <div class="view-card">
+          <div class="view-card" data-id="{{.ArtistID}}">
             <div class="view-card-header">
               <h3>{{.NameOriginal}}</h3>
               <div class="view-card-actions">
@@ -46,7 +69,7 @@
               <p><strong>Units:</strong></p>
               <ul class="member-list">
                 {{range .Units}}
-                <li>{{if .Unit}}{{.Unit.NameOriginal}}{{else}}Unknown Unit{{end}}</li>
+                <li>{{.NameOriginal}}</li>
                 {{end}}
               </ul>
               {{end}}
@@ -196,6 +219,7 @@
     <script src="/static/js/theme-toggle.js"></script>
     <script src="/static/js/fuzzy-search.js"></script>
     <script src="/static/js/color-sync.js"></script>
+    <script src="/static/js/search-filter.js"></script>
     <script>
       let currentArtist = null;
       const categoriesData = JSON.parse("{{.categoriesJSON}}");
@@ -297,6 +321,44 @@
           closeDeleteModal();
         }
       }
+
+      // Initialize search and filter functionality
+      const artistsData = JSON.parse("{{.artistsJSON}}");
+      const searchFilter = new FuzzySearchFilter({
+        searchInputId: 'artist-search',
+        categoryFilterId: 'category-filter',
+        itemsContainerId: 'artists-container',
+        itemClass: 'view-card',
+        noResultsId: 'no-results',
+        data: artistsData,
+        categoriesData: categoriesData,
+        searchFields: [
+          'NameOriginal',
+          'NameEnglish',
+          'Units'  // Will search in Units array
+        ],
+        fuzzyThreshold: 15
+      });
+
+      // Update search stats
+      function updateSearchStats() {
+        const stats = document.getElementById('search-stats');
+        const totalCount = artistsData.length;
+        const filteredCount = searchFilter.filteredData.length;
+
+        if (filteredCount === totalCount) {
+          stats.textContent = `${totalCount} artists total`;
+        } else {
+          stats.textContent = `${filteredCount} of ${totalCount} artists`;
+        }
+      }
+
+      // Override the renderItems method to also update stats
+      const originalRenderItems = searchFilter.renderItems.bind(searchFilter);
+      searchFilter.renderItems = function() {
+        originalRenderItems();
+        updateSearchStats();
+      };
     </script>
   </body>
 </html>

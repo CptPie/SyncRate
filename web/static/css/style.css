@@ -483,6 +483,112 @@ h2 {
   max-width: none;
 }
 
+/* Search and Filter Components */
+.search-filter-container {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.search-filter-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.search-group {
+  flex: 2;
+  min-width: 300px;
+  max-width: 500px;
+}
+
+.filter-group {
+  flex: 1;
+  min-width: 180px;
+  max-width: 220px;
+  margin-top: 0;
+}
+
+.search-group .form-label,
+.filter-group .form-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.search-input,
+.filter-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-medium);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 14px;
+  height: 42px;
+  box-sizing: border-box;
+}
+
+.search-input:focus,
+.filter-select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(94, 129, 172, 0.2);
+}
+
+.search-stats {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 8px;
+  height: 16px; /* Reserve space so both columns have same height */
+}
+
+/* Ensure filter group has matching height */
+.filter-group::after {
+  content: '';
+  display: block;
+  height: 24px; /* Match search-stats height + margin */
+}
+
+.no-results {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px dashed var(--border-medium);
+  margin-top: 20px;
+}
+
+.no-results h3 {
+  margin: 0 0 8px 0;
+  color: var(--text-secondary);
+}
+
+.no-results p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .search-filter-row {
+    flex-direction: column;
+  }
+
+  .search-group,
+  .filter-group {
+    flex: 1;
+    min-width: auto;
+    max-width: none;
+  }
+}
+
 /* Fuzzy search */
 .fuzzy-search-container {
   position: relative;

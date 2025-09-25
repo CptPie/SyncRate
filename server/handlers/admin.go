@@ -298,9 +298,13 @@ func GetViewCategories(db *gorm.DB) gin.HandlerFunc {
 		var categories []models.Category
 		db.Find(&categories)
 
+		// Convert to JSON for JavaScript
+		categoriesJSON, _ := json.Marshal(categories)
+
 		c.HTML(http.StatusOK, "view-categories.html", gin.H{
-			"title":      "View Categories",
-			"categories": categories,
+			"title":          "View Categories",
+			"categories":     categories,
+			"categoriesJSON": string(categoriesJSON),
 		})
 	}
 }
@@ -342,7 +346,7 @@ func GetViewArtists(db *gorm.DB) gin.HandlerFunc {
 		var artists []models.Artist
 		var categories []models.Category
 		var units []models.Unit
-		db.Preload("Category").Preload("Units.Unit").Find(&artists)
+		db.Preload("Category").Preload("Units").Find(&artists)
 		db.Find(&categories)
 		db.Find(&units)
 

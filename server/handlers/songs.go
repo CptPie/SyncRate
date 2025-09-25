@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"strconv"
@@ -15,7 +16,9 @@ func GetSongs(db *gorm.DB) gin.HandlerFunc {
 		log.Println("GetSongs: Starting to load all songs")
 
 		var songs []models.Song
-		result := db.Preload("Artists").Preload("Category").Find(&songs)
+		var categories []models.Category
+
+		result := db.Preload("Artists").Preload("Units").Preload("Category").Find(&songs)
 		if result.Error != nil {
 			log.Printf("GetSongs: Database error: %v", result.Error)
 			c.HTML(http.StatusInternalServerError, "error.html", gin.H{
@@ -24,11 +27,20 @@ func GetSongs(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		db.Find(&categories)
+
+		// Convert to JSON for JavaScript
+		songsJSON, _ := json.Marshal(songs)
+		categoriesJSON, _ := json.Marshal(categories)
+
 		log.Printf("GetSongs: Successfully loaded %d songs", len(songs))
 
 		c.HTML(http.StatusOK, "songs.html", gin.H{
-			"title": "All Songs",
-			"songs": songs,
+			"title":          "All Songs",
+			"songs":          songs,
+			"categories":     categories,
+			"songsJSON":      string(songsJSON),
+			"categoriesJSON": string(categoriesJSON),
 		})
 	}
 }

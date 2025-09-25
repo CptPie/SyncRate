@@ -16,10 +16,27 @@
           <a href="/admin" class="btn-secondary">← Back to Admin</a>
         </div>
 
+        <!-- Search -->
+        <div class="search-filter-container">
+          <div class="search-filter-row">
+            <div class="search-group">
+              <label for="category-search" class="form-label">Search Categories</label>
+              <input type="text" id="category-search" class="search-input" placeholder="Search by category name...">
+              <div class="search-stats" id="search-stats">{{len .categories}} categories total</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- No Results Message -->
+        <div id="no-results" class="no-results" style="display: none;">
+          <h3>No categories found</h3>
+          <p>Try adjusting your search terms</p>
+        </div>
+
         {{if .categories}}
-        <div class="view-grid">
+        <div class="view-grid" id="categories-container">
           {{range .categories}}
-          <div class="view-card">
+          <div class="view-card" data-id="{{.CategoryID}}">
             <div class="view-card-header">
               <h3>{{.Name}}</h3>
               <div class="view-card-actions">
@@ -103,6 +120,7 @@
     </div>
 
     <script src="/static/js/theme-toggle.js"></script>
+    <script src="/static/js/search-filter.js"></script>
     <script>
       function openEditModal(id, name) {
         document.getElementById('edit_name').value = name;
@@ -135,6 +153,42 @@
           closeDeleteModal();
         }
       }
+
+      // Initialize search functionality (no category filter for categories page)
+      const categoriesData = JSON.parse("{{.categoriesJSON}}");
+      const searchFilter = new FuzzySearchFilter({
+        searchInputId: 'category-search',
+        categoryFilterId: null, // No category filter for categories
+        itemsContainerId: 'categories-container',
+        itemClass: 'view-card',
+        noResultsId: 'no-results',
+        data: categoriesData,
+        categoriesData: [],
+        searchFields: [
+          'Name'  // Search by category name only
+        ],
+        fuzzyThreshold: 15
+      });
+
+      // Update search stats
+      function updateSearchStats() {
+        const stats = document.getElementById('search-stats');
+        const totalCount = categoriesData.length;
+        const filteredCount = searchFilter.filteredData.length;
+
+        if (filteredCount === totalCount) {
+          stats.textContent = `${totalCount} categories total`;
+        } else {
+          stats.textContent = `${filteredCount} of ${totalCount} categories`;
+        }
+      }
+
+      // Override the renderItems method to also update stats
+      const originalRenderItems = searchFilter.renderItems.bind(searchFilter);
+      searchFilter.renderItems = function() {
+        originalRenderItems();
+        updateSearchStats();
+      };
     </script>
   </body>
 </html>
