@@ -34,11 +34,13 @@ function setupColorSync(pickerId, textId) {
 
     if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
       picker.value = value;
-      this.style.borderColor = '#ddd';
-      this.style.backgroundColor = 'white';
+      // Remove invalid styling to let CSS handle theming
+      this.style.borderColor = '';
+      this.style.backgroundColor = '';
     } else if (value === '') {
-      this.style.borderColor = '#ddd';
-      this.style.backgroundColor = 'white';
+      // Remove invalid styling to let CSS handle theming
+      this.style.borderColor = '';
+      this.style.backgroundColor = '';
     }
   });
 
