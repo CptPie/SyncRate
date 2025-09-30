@@ -39,7 +39,7 @@
         {{if .songs}}
         <div class="song-grid" id="songs-container">
           {{range .songs}}
-          <div class="song-card" data-id="{{.SongID}}">
+          <div class="song-card" data-id="{{.SongID}}" data-song-id="{{.SongID}}">
             {{if .ThumbnailURL}}
             <img
               src="{{.ThumbnailURL}}"
@@ -58,8 +58,7 @@
             <p><em>{{.NameEnglish}}</em></p>
             {{end}} {{if .Artists}}
             <div class="artist">
-              {{range $index, $songArtist := .Artists}} {{if $index}},
-              {{end}}{{$songArtist.NameOriginal}} {{end}}
+              {{range $index, $songArtist := .Artists}} {{if $index}}, {{end}}<span class="artist-name">{{$songArtist.NameOriginal}}</span> {{end}}
             </div>
             {{end}}
             <div class="categories">
@@ -79,6 +78,7 @@
     </div>
     <script src="/static/js/theme-toggle.js"></script>
     <script src="/static/js/search-filter.js"></script>
+    <script src="/static/js/artist-colors.js"></script>
     <script>
       // Initialize search and filter functionality
       const songsData = JSON.parse('{{.songsJSON}}');
@@ -115,12 +115,17 @@
         }
       }
 
-      // Override the renderItems method to also update stats
+      // Override the renderItems method to also update stats and apply artist colors
       const originalRenderItems = searchFilter.renderItems.bind(searchFilter);
       searchFilter.renderItems = function() {
         originalRenderItems();
         updateSearchStats();
+        // Apply artist colors after rendering
+        initializeArtistColors(this.filteredData);
       };
+
+      // Initialize artist colors on page load
+      initializeArtistColors(songsData);
     </script>
   </body>
 </html>

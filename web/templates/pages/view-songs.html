@@ -42,7 +42,7 @@
         {{if .songs}}
         <div class="view-grid" id="songs-container">
           {{range .songs}}
-          <div class="view-card" data-id="{{.SongID}}">
+          <div class="view-card" data-id="{{.SongID}}" data-song-id="{{.SongID}}">
             <div class="view-card-header">
               <h3>{{.NameOriginal}}</h3>
               <div class="view-card-actions">
@@ -79,7 +79,7 @@
               <p><strong>Artists:</strong></p>
               <ul class="member-list">
                 {{range .Artists}}
-                <li>{{.NameOriginal}}</li>
+                <li><span class="artist-name">{{.NameOriginal}}</span></li>
                 {{end}}
               </ul>
               {{end}}
@@ -205,6 +205,7 @@
     <script src="/static/js/theme-toggle.js"></script>
     <script src="/static/js/fuzzy-search.js"></script>
     <script src="/static/js/search-filter.js"></script>
+    <script src="/static/js/artist-colors.js"></script>
     <script>
       const categoriesData = JSON.parse('{{.categoriesJSON}}');
       const artistsData = JSON.parse('{{.artistsJSON}}');
@@ -339,12 +340,17 @@
         }
       }
 
-      // Override the renderItems method to also update stats
+      // Override the renderItems method to also update stats and apply artist colors
       const originalRenderItems = searchFilter.renderItems.bind(searchFilter);
       searchFilter.renderItems = function() {
         originalRenderItems();
         updateSearchStats();
+        // Apply artist colors after rendering
+        initializeArtistColors(this.filteredData);
       };
+
+      // Initialize artist colors on page load
+      initializeArtistColors(songsData);
     </script>
   </body>
 </html>
