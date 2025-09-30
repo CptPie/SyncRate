@@ -22,6 +22,7 @@ func GetSongs(db *gorm.DB) gin.HandlerFunc {
 		if result.Error != nil {
 			log.Printf("GetSongs: Database error: %v", result.Error)
 			c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+				"title": "SyncRate | Error",
 				"error": "Failed to load songs: " + result.Error.Error(),
 			})
 			return
@@ -36,11 +37,12 @@ func GetSongs(db *gorm.DB) gin.HandlerFunc {
 		log.Printf("GetSongs: Successfully loaded %d songs", len(songs))
 
 		c.HTML(http.StatusOK, "songs.html", gin.H{
-			"title":          "All Songs",
+			"title":          "SyncRate | All Songs",
 			"songs":          songs,
 			"categories":     categories,
 			"songsJSON":      string(songsJSON),
 			"categoriesJSON": string(categoriesJSON),
+			"isAdminPage":    false,
 		})
 	}
 }
@@ -54,6 +56,7 @@ func GetSong(db *gorm.DB) gin.HandlerFunc {
 		if err != nil {
 			log.Printf("GetSong: Invalid song ID format: %v", err)
 			c.HTML(http.StatusBadRequest, "error.html", gin.H{
+				"title": "SyncRate | Error",
 				"error": "Invalid song ID: " + err.Error(),
 			})
 			return

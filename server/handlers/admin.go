@@ -25,7 +25,7 @@ func GetAdmin(db *gorm.DB) gin.HandlerFunc {
 		db.Model(&models.Song{}).Count(&songCount)
 
 		c.HTML(http.StatusOK, "admin-index.html", gin.H{
-			"title":         "Admin Panel",
+			"title":         "SyncRate | Admin Panel",
 			"categoryCount": categoryCount,
 			"unitCount":     unitCount,
 			"artistCount":   artistCount,
@@ -43,7 +43,7 @@ func GetAddCategory(db *gorm.DB) gin.HandlerFunc {
 		db.Find(&categories)
 
 		c.HTML(http.StatusOK, "add-category.html", gin.H{
-			"title":      "Add Category",
+			"title":      "SyncRate | Add Category",
 			"categories": categories,
 		})
 	}
@@ -66,7 +66,7 @@ func GetAddUnit(db *gorm.DB) gin.HandlerFunc {
 		artistsJSON, _ := json.Marshal(artists)
 
 		c.HTML(http.StatusOK, "add-unit.html", gin.H{
-			"title":          "Add Unit",
+			"title":          "SyncRate | Add Unit",
 			"units":          units,
 			"categories":     categories,
 			"artists":        artists,
@@ -93,7 +93,7 @@ func GetAddArtist(db *gorm.DB) gin.HandlerFunc {
 		categoriesJSON, _ := json.Marshal(categories)
 
 		c.HTML(http.StatusOK, "add-artist.html", gin.H{
-			"title":          "Add Artist",
+			"title":          "SyncRate | Add Artist",
 			"artists":        artists,
 			"units":          units,
 			"categories":     categories,
@@ -121,7 +121,7 @@ func GetAddSong(db *gorm.DB) gin.HandlerFunc {
 		unitsJSON, _ := json.Marshal(units)
 
 		c.HTML(http.StatusOK, "add-song.html", gin.H{
-			"title":          "Add Song",
+			"title":          "SyncRate | Add Song",
 			"categories":     categories,
 			"artists":        artists,
 			"units":          units,
@@ -302,9 +302,10 @@ func GetViewCategories(db *gorm.DB) gin.HandlerFunc {
 		categoriesJSON, _ := json.Marshal(categories)
 
 		c.HTML(http.StatusOK, "view-categories.html", gin.H{
-			"title":          "View Categories",
+			"title":          "SyncRate | View Categories",
 			"categories":     categories,
 			"categoriesJSON": string(categoriesJSON),
+			"isAdminPage":    true,
 		})
 	}
 }
@@ -327,13 +328,14 @@ func GetViewUnits(db *gorm.DB) gin.HandlerFunc {
 		artistsJSON, _ := json.Marshal(artists)
 
 		c.HTML(http.StatusOK, "view-units.html", gin.H{
-			"title":          "View Units",
+			"title":          "SyncRate | View Units",
 			"units":          units,
 			"categories":     categories,
 			"artists":        artists,
 			"unitsJSON":      string(unitsJSON),
 			"categoriesJSON": string(categoriesJSON),
 			"artistsJSON":    string(artistsJSON),
+			"isAdminPage":    true,
 		})
 	}
 }
@@ -356,13 +358,14 @@ func GetViewArtists(db *gorm.DB) gin.HandlerFunc {
 		unitsJSON, _ := json.Marshal(units)
 
 		c.HTML(http.StatusOK, "view-artists.html", gin.H{
-			"title":          "View Artists",
+			"title":          "SyncRate | View Artists",
 			"artists":        artists,
 			"categories":     categories,
 			"units":          units,
 			"artistsJSON":    string(artistsJSON),
 			"categoriesJSON": string(categoriesJSON),
 			"unitsJSON":      string(unitsJSON),
+			"isAdminPage":    true,
 		})
 	}
 }
@@ -873,7 +876,7 @@ func GetViewSongs(db *gorm.DB) gin.HandlerFunc {
 		unitsJSON, _ := json.Marshal(units)
 
 		c.HTML(http.StatusOK, "view-songs.html", gin.H{
-			"title":          "View Songs",
+			"title":          "SyncRate | View Songs",
 			"songs":          songs,
 			"categories":     categories,
 			"artists":        artists,
@@ -882,6 +885,7 @@ func GetViewSongs(db *gorm.DB) gin.HandlerFunc {
 			"categoriesJSON": string(categoriesJSON),
 			"artistsJSON":    string(artistsJSON),
 			"unitsJSON":      string(unitsJSON),
+			"isAdminPage":    true,
 		})
 	}
 }

@@ -11,7 +11,7 @@ import (
 func GetHome(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		templateData := gin.H{
-			"title": "SyncRate - Music Rating",
+			"title": "SyncRate | Home",
 		}
 
 		c.HTML(http.StatusOK, "home.html", templateData)

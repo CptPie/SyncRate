@@ -10,7 +10,7 @@ import (
 func GetLogin(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.HTML(http.StatusOK, "login.html", gin.H{
-			"title": "Login",
+			"title": "SyncRate | Login",
 		})
 	}
 }
@@ -27,7 +27,7 @@ func PostLogin(db *gorm.DB) gin.HandlerFunc {
 func GetRegister(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.HTML(http.StatusOK, "register.html", gin.H{
-			"title": "Register",
+			"title": "SyncRate | Register",
 		})
 	}
 }
