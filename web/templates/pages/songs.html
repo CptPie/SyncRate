@@ -61,6 +61,11 @@
               {{range $index, $songArtist := .Artists}} {{if $index}}, {{end}}<span class="artist-name">{{$songArtist.NameOriginal}}</span> {{end}}
             </div>
             {{end}}
+            {{if .Units}}
+            <div class="units">
+              {{range $index, $songUnit := .Units}} {{if $index}}, {{end}}<span class="unit-name">{{$songUnit.NameOriginal}}</span> {{end}}
+            </div>
+            {{end}}
             <div class="categories">
               {{if .Category}}
               <span class="category">{{.Category.Name}}</span>
@@ -120,12 +125,12 @@
       searchFilter.renderItems = function() {
         originalRenderItems();
         updateSearchStats();
-        // Apply artist colors after rendering
-        initializeArtistColors(this.filteredData);
+        // Apply artist and unit colors after rendering
+        initializeAllColors(this.filteredData);
       };
 
-      // Initialize artist colors on page load
-      initializeArtistColors(songsData);
+      // Initialize artist and unit colors on page load
+      initializeAllColors(songsData);
     </script>
   </body>
 </html>

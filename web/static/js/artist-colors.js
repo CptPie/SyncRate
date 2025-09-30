@@ -1,6 +1,6 @@
 /**
- * Artist color styling functionality
- * Applies artist colors to elements with readable text colors
+ * Artist and Unit color styling functionality
+ * Applies artist and unit colors to elements with readable text colors
  */
 
 /**
@@ -42,12 +42,12 @@ function getReadableTextColor(backgroundColor) {
 }
 
 /**
- * Apply artist color styling to an element
+ * Apply color styling to an element (works for both artists and units)
  * @param {HTMLElement} element - The element to style
- * @param {string} primaryColor - Artist's primary color (can be null/empty)
- * @param {string} secondaryColor - Artist's secondary color (optional)
+ * @param {string} primaryColor - Primary color (can be null/empty)
+ * @param {string} secondaryColor - Secondary color (optional)
  */
-function applyArtistColor(element, primaryColor, secondaryColor = null) {
+function applyElementColor(element, primaryColor, secondaryColor = null) {
   if (!element) {
     return;
   }
@@ -101,7 +101,7 @@ function initializeArtistColors(songData) {
         const artistElements = songElement.querySelectorAll(".artist-name");
         if (artistElements[index]) {
           // Apply color styling - will use fallback if no PrimaryColor
-          applyArtistColor(
+          applyElementColor(
             artistElements[index],
             artist.PrimaryColor,
             artist.SecondaryColor,
@@ -110,4 +110,47 @@ function initializeArtistColors(songData) {
       });
     });
   });
+}
+
+/**
+ * Apply unit colors to all unit elements in song tiles
+ * @param {Array} songData - Array of song objects with unit data
+ */
+function initializeUnitColors(songData) {
+  if (!songData || !Array.isArray(songData)) {
+    return;
+  }
+
+  songData.forEach((song) => {
+    if (!song.Units || !Array.isArray(song.Units)) {
+      return;
+    }
+
+    song.Units.forEach((unit, index) => {
+      // Find all unit elements for this song
+      const songElements = document.querySelectorAll(
+        `[data-song-id="${song.SongID}"]`,
+      );
+      songElements.forEach((songElement) => {
+        const unitElements = songElement.querySelectorAll(".unit-name");
+        if (unitElements[index]) {
+          // Apply color styling - will use fallback if no PrimaryColor
+          applyElementColor(
+            unitElements[index],
+            unit.PrimaryColor,
+            unit.SecondaryColor,
+          );
+        }
+      });
+    });
+  });
+}
+
+/**
+ * Initialize both artist and unit colors for song tiles
+ * @param {Array} songData - Array of song objects with artist and unit data
+ */
+function initializeAllColors(songData) {
+  initializeArtistColors(songData);
+  initializeUnitColors(songData);
 }

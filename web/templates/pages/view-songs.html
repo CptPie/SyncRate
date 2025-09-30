@@ -87,7 +87,7 @@
               <p><strong>Units:</strong></p>
               <ul class="member-list">
                 {{range .Units}}
-                <li>{{.NameOriginal}}</li>
+                <li><span class="unit-name">{{.NameOriginal}}</span></li>
                 {{end}}
               </ul>
               {{end}}
@@ -345,12 +345,12 @@
       searchFilter.renderItems = function() {
         originalRenderItems();
         updateSearchStats();
-        // Apply artist colors after rendering
-        initializeArtistColors(this.filteredData);
+        // Apply artist and unit colors after rendering
+        initializeAllColors(this.filteredData);
       };
 
-      // Initialize artist colors on page load
-      initializeArtistColors(songsData);
+      // Initialize artist and unit colors on page load
+      initializeAllColors(songsData);
     </script>
   </body>
 </html>
