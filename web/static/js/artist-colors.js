@@ -44,20 +44,27 @@ function getReadableTextColor(backgroundColor) {
 /**
  * Apply artist color styling to an element
  * @param {HTMLElement} element - The element to style
- * @param {string} primaryColor - Artist's primary color
+ * @param {string} primaryColor - Artist's primary color (can be null/empty)
  * @param {string} secondaryColor - Artist's secondary color (optional)
  */
 function applyArtistColor(element, primaryColor, secondaryColor = null) {
-  if (!element || !primaryColor) {
+  if (!element) {
     return;
   }
 
-  // Set background color
-  element.style.backgroundColor = primaryColor;
+  // Use fallback CSS variable if no primary color is provided
+  if (primaryColor) {
+    // Set custom background color
+    element.style.backgroundColor = primaryColor;
 
-  // Set readable text color
-  const textColor = getReadableTextColor(primaryColor);
-  element.style.color = textColor;
+    // Set readable text color
+    const textColor = getReadableTextColor(primaryColor);
+    element.style.color = textColor;
+  } else {
+    // Use CSS variable for fallback - this will update automatically with theme changes
+    element.style.backgroundColor = "var(--bg-accent)";
+    element.style.color = "var(--text-primary)";
+  }
 
   // Add some padding and border radius for better visual appearance
   element.style.padding = "4px 8px";
@@ -86,10 +93,6 @@ function initializeArtistColors(songData) {
     }
 
     song.Artists.forEach((artist, index) => {
-      if (!artist.PrimaryColor) {
-        return; // Skip artists without colors
-      }
-
       // Find all artist elements for this song
       const songElements = document.querySelectorAll(
         `[data-song-id="${song.SongID}"]`,
@@ -97,6 +100,7 @@ function initializeArtistColors(songData) {
       songElements.forEach((songElement) => {
         const artistElements = songElement.querySelectorAll(".artist-name");
         if (artistElements[index]) {
+          // Apply color styling - will use fallback if no PrimaryColor
           applyArtistColor(
             artistElements[index],
             artist.PrimaryColor,
