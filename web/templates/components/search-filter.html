@@ -1,0 +1,187 @@
+{{define "songs-search-filter"}}
+<!-- Search and Filter Component for Songs -->
+<div class="search-filter-container">
+  <div class="search-filter-row">
+    <div class="search-group">
+      <label for="song-search" class="form-label">Search Songs</label>
+      <input type="text" id="song-search" class="search-input" placeholder="Search by song name, artist, unit, or source URL...">
+      <div class="search-stats" id="search-stats">{{len .songs}} songs total</div>
+    </div>
+    <div class="filter-group">
+      <label for="category-filter" class="form-label">Filter by Category</label>
+      <select id="category-filter" class="filter-select">
+        <option value="">All Categories</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- No Results Message -->
+<div id="no-results" class="no-results" style="display: none;">
+  <h3>No songs found</h3>
+  <p>Try adjusting your search terms or filters</p>
+</div>
+
+<script>
+// Search Filter Initialization for Songs
+function initializeSongsSearch() {
+  // Check if dependencies are loaded
+  if (typeof FuzzySearchFilter === 'undefined' || typeof initializeAllColors === 'undefined') {
+    console.error('Search dependencies not loaded yet for songs search');
+    return false;
+  }
+
+  const songsData = JSON.parse('{{.songsJSON}}');
+  const categoriesData = JSON.parse('{{.categoriesJSON}}');
+
+  const searchFilter = new FuzzySearchFilter({
+    searchInputId: 'song-search',
+    categoryFilterId: 'category-filter',
+    itemsContainerId: 'songs-container',
+    itemClass: 'song-card',
+    noResultsId: 'no-results',
+    data: songsData,
+    categoriesData: categoriesData,
+    searchFields: [
+      'NameOriginal',
+      'NameEnglish',
+      'SourceURL',
+      'Artists',
+      'Units'
+    ],
+    fuzzyThreshold: 15
+  });
+
+  // Update search stats
+  function updateSearchStats() {
+    const stats = document.getElementById('search-stats');
+    const totalCount = songsData.length;
+    const filteredCount = searchFilter.filteredData.length;
+
+    if (filteredCount === totalCount) {
+      stats.textContent = `${totalCount} songs total`;
+    } else {
+      stats.textContent = `${filteredCount} of ${totalCount} songs`;
+    }
+  }
+
+  // Override the renderItems method to also update stats and apply colors
+  const originalRenderItems = searchFilter.renderItems.bind(searchFilter);
+  searchFilter.renderItems = function() {
+    originalRenderItems();
+    updateSearchStats();
+    // Apply colors after rendering
+    initializeAllColors(this.filteredData);
+  };
+
+  // Initialize colors and stats on page load
+  initializeAllColors(songsData);
+  updateSearchStats();
+
+  // Make searchFilter available globally if needed
+  window.songsDataSearchFilter = searchFilter;
+  return true;
+}
+
+// Try to initialize immediately, or wait for DOM ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeSongsSearch);
+} else {
+  initializeSongsSearch();
+}
+</script>
+{{end}}
+
+{{define "admin-songs-search-filter"}}
+<!-- Search and Filter Component for Admin Songs -->
+<div class="search-filter-container">
+  <div class="search-filter-row">
+    <div class="search-group">
+      <label for="song-search" class="form-label">Search Songs</label>
+      <input type="text" id="song-search" class="search-input" placeholder="Search by song name, artist, unit, or source URL...">
+      <div class="search-stats" id="search-stats">{{len .songs}} songs total</div>
+    </div>
+    <div class="filter-group">
+      <label for="category-filter" class="form-label">Filter by Category</label>
+      <select id="category-filter" class="filter-select">
+        <option value="">All Categories</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- No Results Message -->
+<div id="no-results" class="no-results" style="display: none;">
+  <h3>No songs found</h3>
+  <p>Try adjusting your search terms or filters</p>
+</div>
+
+<script>
+// Search Filter Initialization for Admin Songs
+function initializeAdminSongsSearch() {
+  // Check if dependencies are loaded
+  if (typeof FuzzySearchFilter === 'undefined' || typeof initializeAllColors === 'undefined') {
+    console.error('Search dependencies not loaded yet for admin songs search');
+    return false;
+  }
+
+  const songsData = JSON.parse('{{.songsJSON}}');
+  const categoriesData = JSON.parse('{{.categoriesJSON}}');
+
+  const searchFilter = new FuzzySearchFilter({
+    searchInputId: 'song-search',
+    categoryFilterId: 'category-filter',
+    itemsContainerId: 'songs-container',
+    itemClass: 'view-card',
+    noResultsId: 'no-results',
+    data: songsData,
+    categoriesData: categoriesData,
+    searchFields: [
+      'NameOriginal',
+      'NameEnglish',
+      'SourceURL',
+      'Artists',
+      'Units'
+    ],
+    fuzzyThreshold: 15
+  });
+
+  // Update search stats
+  function updateSearchStats() {
+    const stats = document.getElementById('search-stats');
+    const totalCount = songsData.length;
+    const filteredCount = searchFilter.filteredData.length;
+
+    if (filteredCount === totalCount) {
+      stats.textContent = `${totalCount} songs total`;
+    } else {
+      stats.textContent = `${filteredCount} of ${totalCount} songs`;
+    }
+  }
+
+  // Override the renderItems method to also update stats and apply colors
+  const originalRenderItems = searchFilter.renderItems.bind(searchFilter);
+  searchFilter.renderItems = function() {
+    originalRenderItems();
+    updateSearchStats();
+    // Apply colors after rendering
+    initializeAllColors(this.filteredData);
+  };
+
+  // Initialize colors and stats on page load
+  initializeAllColors(songsData);
+  updateSearchStats();
+
+  // Make searchFilter available globally if needed
+  window.songsDataSearchFilter = searchFilter;
+  return true;
+}
+
+// Try to initialize immediately, or wait for DOM ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeAdminSongsSearch);
+} else {
+  initializeAdminSongsSearch();
+}
+</script>
+{{end}}
