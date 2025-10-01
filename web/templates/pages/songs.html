@@ -29,21 +29,26 @@
             <p><em>{{.NameEnglish}}</em></p>
             {{end}} {{if .Artists}}
             <div class="artist">
+              {{if eq (len .Artists) 1}}Artist{{else}}Artists{{end}}:
               {{range $index, $songArtist := .Artists}} {{if $index}}, {{end}}<span class="artist-name">{{$songArtist.NameOriginal}}</span> {{end}}
             </div>
             {{end}}
             {{if .Units}}
             <div class="units">
+              {{if eq (len .Units) 1}}Group{{else}}Groups{{end}}:
               {{range $index, $songUnit := .Units}} {{if $index}}, {{end}}<span class="unit-name">{{$songUnit.NameOriginal}}</span> {{end}}
             </div>
             {{end}}
+            {{if or .Category .IsCover}}
             <div class="categories">
+              Tags:
               {{if .Category}}
               <span class="category">{{.Category.Name}}</span>
               {{end}} {{if .IsCover}}
               <span class="category" style="background: #28a745">Cover</span>
               {{end}}
             </div>
+            {{end}}
             </div>
           </a>
           {{end}}

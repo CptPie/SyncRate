@@ -128,10 +128,12 @@ class SearchFilter {
 
         if (!container) return;
 
-        // Hide all existing items
+        // Hide all existing items - target the outermost container for each item
         const allItems = container.querySelectorAll('.' + this.itemClass);
         allItems.forEach(item => {
-            item.style.display = 'none';
+            // Find the outermost wrapper (could be an <a> tag or the item itself)
+            const wrapper = item.closest('a') || item;
+            wrapper.style.display = 'none';
         });
 
         if (this.filteredData.length === 0) {
@@ -150,7 +152,9 @@ class SearchFilter {
             const itemId = this.getItemId(dataItem);
             const itemElement = container.querySelector(`[data-id="${itemId}"]`);
             if (itemElement) {
-                itemElement.style.display = '';
+                // Find the outermost wrapper (could be an <a> tag or the item itself)
+                const wrapper = itemElement.closest('a') || itemElement;
+                wrapper.style.display = '';
             }
         });
     }

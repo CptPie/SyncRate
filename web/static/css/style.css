@@ -316,6 +316,9 @@ h2 {
 
 .song-card .categories {
   margin-top: 8px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 300;
 }
 
 .song-card .category {
