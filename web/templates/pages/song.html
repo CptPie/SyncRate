@@ -10,12 +10,28 @@
       <main>
         <div class="song-detail-layout" data-song-id="{{.song.SongID}}">
           <div class="song-info">
-            <h2>{{.song.NameOriginal}}</h2>
-            {{if .song.NameEnglish}}
-            <h3 style="color: #666; margin-top: -10px">
-              {{.song.NameEnglish}}
-            </h3>
-            {{end}} {{if .song.Artists}}
+            <div class="song-header">
+              <div class="song-titles">
+                <h2>{{.song.NameOriginal}}</h2>
+                {{if .song.NameEnglish}}
+                <h3 style="color: #666; margin-top: -10px">
+                  {{.song.NameEnglish}}
+                </h3>
+                {{end}}
+              </div>
+              {{if gt .vote_count 0}}
+              <div class="song-page-score">
+                <div class="score-main">
+                  <span class="score-value">{{printf "%.1f" .average_score}}</span>
+                  <span class="score-max">/10</span>
+                </div>
+                <div class="score-subtitle">
+                  {{if eq .vote_count 1}}1 vote{{else}}{{.vote_count}} votes{{end}}
+                </div>
+              </div>
+              {{end}}
+            </div>
+            {{if .song.Artists}}
             <div class="artist">
               {{if eq (len .song.Artists) 1}}Artist{{else}}Artists{{end}}:
               {{range $index, $songArtist := .song.Artists}} {{if $index}}, {{end}}<span class="artist-name">{{$songArtist.NameOriginal}}</span> {{end}}

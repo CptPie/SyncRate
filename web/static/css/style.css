@@ -1219,3 +1219,134 @@ input[type="color"]:focus {
     font-size: 12px;
   }
 }
+
+/* Song Card Average Score Styles */
+.song-card-header {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+}
+
+.song-average-score {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: var(--bg-primary);
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 2;
+  opacity: 0.95;
+}
+
+.score-value {
+  color: var(--accent-primary);
+  font-weight: 700;
+}
+
+.score-separator {
+  color: var(--text-secondary);
+  margin: 0 1px;
+}
+
+.score-max {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+[data-theme="dark"] .song-average-score {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+@media (max-width: 768px) {
+  .song-average-score {
+    top: 4px;
+    right: 4px;
+    padding: 2px 6px;
+    font-size: 11px;
+  }
+}
+
+/* Song Page Score Styles */
+.song-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.song-titles {
+  flex: 1;
+}
+
+.song-page-score {
+  text-align: center;
+  padding: 8px 12px;
+  background: var(--bg-accent);
+  border: 1px solid var(--accent-primary);
+  border-radius: 8px;
+  min-width: 70px;
+  margin-left: 20px;
+}
+
+.score-main {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.score-main .score-value {
+  color: var(--accent-primary);
+  font-size: 18px;
+}
+
+.score-main .score-max {
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.score-subtitle {
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+@media (max-width: 768px) {
+  .song-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .song-page-score {
+    margin-left: 0;
+    margin-top: 10px;
+    align-self: flex-start;
+    padding: 6px 10px;
+    min-width: 60px;
+  }
+
+  .score-main {
+    font-size: 14px;
+  }
+
+  .score-main .score-value {
+    font-size: 16px;
+  }
+
+  .score-main .score-max {
+    font-size: 12px;
+  }
+
+  .score-subtitle {
+    font-size: 9px;
+  }
+}

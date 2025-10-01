@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/CptPie/SyncRate/database"
 	"github.com/CptPie/SyncRate/models"
 	"github.com/CptPie/SyncRate/server/utils"
 	"github.com/gin-gonic/gin"
@@ -16,6 +17,13 @@ import (
 func GetSongs(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		log.Println("GetSongs: Starting to load all songs")
+
+		// Define a structure to hold song data with average score
+		type SongWithAverage struct {
+			models.Song
+			AverageScore float64 `json:"average_score"`
+			VoteCount    int64   `json:"vote_count"`
+		}
 
 		var songs []models.Song
 		var categories []models.Category
@@ -32,15 +40,41 @@ func GetSongs(db *gorm.DB) gin.HandlerFunc {
 
 		db.Find(&categories)
 
-		// Convert to JSON for JavaScript
-		songsJSON, _ := json.Marshal(songs)
+		// Create database wrapper to use existing functions
+		dbWrapper := &database.Database{DB: db}
+
+		// Calculate average scores for each song using existing database functions
+		var songsWithAverages []SongWithAverage
+		for _, song := range songs {
+			avgScore, err := dbWrapper.GetAverageRatingForSong(song.SongID)
+			if err != nil {
+				log.Printf("Error getting average rating for song %d: %v", song.SongID, err)
+				avgScore = 0 // Default to 0 if error
+			}
+
+			voteCount, err := dbWrapper.GetVoteCountForSong(song.SongID)
+			if err != nil {
+				log.Printf("Error getting vote count for song %d: %v", song.SongID, err)
+				voteCount = 0 // Default to 0 if error
+			}
+
+			songWithAvg := SongWithAverage{
+				Song:         song,
+				AverageScore: avgScore,
+				VoteCount:    voteCount,
+			}
+			songsWithAverages = append(songsWithAverages, songWithAvg)
+		}
+
+		// Convert to JSON for JavaScript (using the enhanced structure)
+		songsJSON, _ := json.Marshal(songsWithAverages)
 		categoriesJSON, _ := json.Marshal(categories)
 
 		log.Printf("GetSongs: Successfully loaded %d songs", len(songs))
 
 		templateData := GetUserContext(c)
 		templateData["title"] = "SyncRate | All Songs"
-		templateData["songs"] = songs
+		templateData["songs"] = songsWithAverages
 		templateData["categories"] = categories
 		templateData["songsJSON"] = string(songsJSON)
 		templateData["categoriesJSON"] = string(categoriesJSON)
@@ -125,6 +159,24 @@ func GetSong(db *gorm.DB) gin.HandlerFunc {
 		templateData["votes"] = votesWithUsers
 		templateData["songJSON"] = string(songJSON)
 		templateData["embedURL"] = embedURL
+
+		// Calculate average score and vote count for this song
+		dbWrapper := &database.Database{DB: db}
+
+		avgScore, err := dbWrapper.GetAverageRatingForSong(uint(id))
+		if err != nil {
+			log.Printf("Error getting average rating for song %d: %v", id, err)
+			avgScore = 0
+		}
+
+		voteCount, err := dbWrapper.GetVoteCountForSong(uint(id))
+		if err != nil {
+			log.Printf("Error getting vote count for song %d: %v", id, err)
+			voteCount = 0
+		}
+
+		templateData["average_score"] = avgScore
+		templateData["vote_count"] = voteCount
 
 		// Check if current user has voted for this song
 		if userID, exists := c.Get("user_id"); exists && userID != nil {

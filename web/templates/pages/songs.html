@@ -17,13 +17,22 @@
           {{range .songs}}
           <a href="/songs/{{.SongID}}" style="text-decoration: none; color: inherit">
             <div class="song-card" data-id="{{.SongID}}" data-song-id="{{.SongID}}">
-              {{if .ThumbnailURL}}
-              <img
-                src="{{.ThumbnailURL}}"
-                alt="{{.NameOriginal}}"
-                class="song-card-image"
-              />
-              {{end}}
+              <div class="song-card-header">
+                {{if .ThumbnailURL}}
+                <img
+                  src="{{.ThumbnailURL}}"
+                  alt="{{.NameOriginal}}"
+                  class="song-card-image"
+                />
+                {{end}}
+                {{if gt .VoteCount 0}}
+                <div class="song-average-score">
+                  <span class="score-value">{{printf "%.1f" .AverageScore}}</span>
+                  <span class="score-separator">/</span>
+                  <span class="score-max">10</span>
+                </div>
+                {{end}}
+              </div>
               <h3>{{.NameOriginal}}</h3>
             {{if .NameEnglish}}
             <p><em>{{.NameEnglish}}</em></p>
