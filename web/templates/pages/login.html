@@ -10,6 +10,9 @@
         <main>
             <div class="form-container">
                 <h2>Login</h2>
+                {{if .error}}
+                    <div class="error-message">{{.error}}</div>
+                {{end}}
                 <form action="/login" method="POST">
                     <div class="form-group">
                         <label for="username" class="form-label">Username:</label>

@@ -37,14 +37,15 @@ func GetSongs(db *gorm.DB) gin.HandlerFunc {
 
 		log.Printf("GetSongs: Successfully loaded %d songs", len(songs))
 
-		c.HTML(http.StatusOK, "songs.html", gin.H{
-			"title":          "SyncRate | All Songs",
-			"songs":          songs,
-			"categories":     categories,
-			"songsJSON":      string(songsJSON),
-			"categoriesJSON": string(categoriesJSON),
-			"isAdminPage":    false,
-		})
+		templateData := GetUserContext(c)
+		templateData["title"] = "SyncRate | All Songs"
+		templateData["songs"] = songs
+		templateData["categories"] = categories
+		templateData["songsJSON"] = string(songsJSON)
+		templateData["categoriesJSON"] = string(categoriesJSON)
+		templateData["isAdminPage"] = false
+
+		c.HTML(http.StatusOK, "songs.html", templateData)
 	}
 }
 
@@ -81,13 +82,12 @@ func GetSong(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		var votes []models.Vote
-		voteResult := db.Where("song_id = ?", id).Preload("User").Find(&votes)
+		voteResult := db.Where("song_id = ?", id).Find(&votes)
 		if voteResult.Error != nil {
 			log.Printf("GetSong: Error loading votes for song %d: %v", id, voteResult.Error)
 		}
 
 		log.Printf("GetSong: Successfully loaded song '%s' with %d votes", song.NameOriginal, len(votes))
-
 		log.Printf("%v\n", song)
 
 		// Convert song to JSON for JavaScript color initialization
@@ -107,13 +107,14 @@ func GetSong(db *gorm.DB) gin.HandlerFunc {
 			}
 		}
 
-		c.HTML(http.StatusOK, "song.html", gin.H{
-			"title":    song.NameOriginal,
-			"song":     song,
-			"votes":    votes,
-			"songJSON": string(songJSON),
-			"embedURL": embedURL,
-		})
+		templateData := GetUserContext(c)
+		templateData["title"] = song.NameOriginal
+		templateData["song"] = song
+		templateData["votes"] = votes
+		templateData["songJSON"] = string(songJSON)
+		templateData["embedURL"] = embedURL
+
+		c.HTML(http.StatusOK, "song.html", templateData)
 	}
 }
 

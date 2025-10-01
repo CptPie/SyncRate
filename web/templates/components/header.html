@@ -14,9 +14,16 @@
         <nav class="nav">
             <a href="/">Home</a>
             <a href="/songs">Songs</a>
-            <a href="/admin">Admin</a>
-            <a href="/login">Login</a>
-            <a href="/register">Register</a>
+            {{if .is_authenticated}}
+                <a href="/admin">Admin</a>
+                <span class="user-info">Welcome, {{.username}}!</span>
+                <form action="/logout" method="POST" style="display: inline;">
+                    <button type="submit" class="logout-btn">Logout</button>
+                </form>
+            {{else}}
+                <a href="/login">Login</a>
+                <a href="/register">Register</a>
+            {{end}}
         </nav>
         <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
             <span class="theme-icon sun-icon">☀️</span>

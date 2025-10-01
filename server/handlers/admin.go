@@ -24,13 +24,14 @@ func GetAdmin(db *gorm.DB) gin.HandlerFunc {
 		db.Model(&models.Artist{}).Count(&artistCount)
 		db.Model(&models.Song{}).Count(&songCount)
 
-		c.HTML(http.StatusOK, "admin-index.html", gin.H{
-			"title":         "SyncRate | Admin Panel",
-			"categoryCount": categoryCount,
-			"unitCount":     unitCount,
-			"artistCount":   artistCount,
-			"songCount":     songCount,
-		})
+		templateData := GetUserContext(c)
+		templateData["title"] = "SyncRate | Admin Panel"
+		templateData["categoryCount"] = categoryCount
+		templateData["unitCount"] = unitCount
+		templateData["artistCount"] = artistCount
+		templateData["songCount"] = songCount
+
+		c.HTML(http.StatusOK, "admin-index.html", templateData)
 	}
 }
 

@@ -5,6 +5,9 @@ import (
 	"log"
 
 	"github.com/CptPie/SyncRate/server/handlers"
+	"github.com/CptPie/SyncRate/server/middleware"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -14,6 +17,19 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 
 	// Configure trusted proxies (disable for direct connections)
 	r.SetTrustedProxies(nil)
+
+	// Session setup
+	store := cookie.NewStore([]byte("your-secret-key-change-this-in-production"))
+	store.Options(sessions.Options{
+		Path:     "/",
+		MaxAge:   86400 * 7, // 7 days
+		HttpOnly: true,
+		Secure:   false, // Set to true in production with HTTPS
+	})
+	r.Use(sessions.Sessions("syncrate-session", store))
+
+	// Add user context middleware to all routes
+	r.Use(middleware.SetUserContext())
 
 	// Load HTML templates with proper parsing
 	log.Println("Loading component templates...")
@@ -49,36 +65,40 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	r.POST("/register", handlers.PostRegister(db))
 	r.POST("/logout", handlers.PostLogout(db))
 
-	// Admin routes
-	r.GET("/admin", handlers.GetAdmin(db))
+	// Admin routes (protected)
+	admin := r.Group("/admin")
+	admin.Use(middleware.RequireAuth())
+	{
+		admin.GET("/", handlers.GetAdmin(db))
 
-	// Add routes
-	r.GET("/admin/add-category", handlers.GetAddCategory(db))
-	r.POST("/admin/add-category", handlers.PostAddCategory(db))
-	r.GET("/admin/add-unit", handlers.GetAddUnit(db))
-	r.POST("/admin/add-unit", handlers.PostAddUnit(db))
-	r.GET("/admin/add-artist", handlers.GetAddArtist(db))
-	r.POST("/admin/add-artist", handlers.PostAddArtist(db))
-	r.GET("/admin/add-song", handlers.GetAddSong(db))
-	r.POST("/admin/add-song", handlers.PostAddSong(db))
+		// Add routes
+		admin.GET("/add-category", handlers.GetAddCategory(db))
+		admin.POST("/add-category", handlers.PostAddCategory(db))
+		admin.GET("/add-unit", handlers.GetAddUnit(db))
+		admin.POST("/add-unit", handlers.PostAddUnit(db))
+		admin.GET("/add-artist", handlers.GetAddArtist(db))
+		admin.POST("/add-artist", handlers.PostAddArtist(db))
+		admin.GET("/add-song", handlers.GetAddSong(db))
+		admin.POST("/add-song", handlers.PostAddSong(db))
 
-	// View routes
-	r.GET("/admin/categories", handlers.GetViewCategories(db))
-	r.GET("/admin/units", handlers.GetViewUnits(db))
-	r.GET("/admin/artists", handlers.GetViewArtists(db))
-	r.GET("/admin/view-songs", handlers.GetViewSongs(db))
+		// View routes
+		admin.GET("/categories", handlers.GetViewCategories(db))
+		admin.GET("/units", handlers.GetViewUnits(db))
+		admin.GET("/artists", handlers.GetViewArtists(db))
+		admin.GET("/view-songs", handlers.GetViewSongs(db))
 
-	// Edit routes
-	r.POST("/admin/categories/:id/edit", handlers.PostEditCategory(db))
-	r.POST("/admin/units/:id/edit", handlers.PostEditUnit(db))
-	r.POST("/admin/artists/:id/edit", handlers.PostEditArtist(db))
-	r.POST("/admin/songs/:id/edit", handlers.PostEditSong(db))
+		// Edit routes
+		admin.POST("/categories/:id/edit", handlers.PostEditCategory(db))
+		admin.POST("/units/:id/edit", handlers.PostEditUnit(db))
+		admin.POST("/artists/:id/edit", handlers.PostEditArtist(db))
+		admin.POST("/songs/:id/edit", handlers.PostEditSong(db))
 
-	// Delete routes
-	r.POST("/admin/categories/:id/delete", handlers.PostDeleteCategory(db))
-	r.POST("/admin/units/:id/delete", handlers.PostDeleteUnit(db))
-	r.POST("/admin/artists/:id/delete", handlers.PostDeleteArtist(db))
-	r.POST("/admin/songs/:id/delete", handlers.PostDeleteSong(db))
+		// Delete routes
+		admin.POST("/categories/:id/delete", handlers.PostDeleteCategory(db))
+		admin.POST("/units/:id/delete", handlers.PostDeleteUnit(db))
+		admin.POST("/artists/:id/delete", handlers.PostDeleteArtist(db))
+		admin.POST("/songs/:id/delete", handlers.PostDeleteSong(db))
+	}
 
 	return r
 }
