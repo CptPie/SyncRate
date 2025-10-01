@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/CptPie/SyncRate/models"
 	"github.com/CptPie/SyncRate/server/utils"
@@ -81,13 +82,24 @@ func GetSong(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		var votes []models.Vote
-		voteResult := db.Where("song_id = ?", id).Find(&votes)
+		// Load votes with user information using a JOIN
+		type VoteWithUser struct {
+			models.Vote
+			Username string
+		}
+
+		var votesWithUsers []VoteWithUser
+		voteResult := db.Table("votes").
+			Select("votes.*, users.username").
+			Joins("LEFT JOIN users ON votes.user_id = users.user_id").
+			Where("votes.song_id = ?", id).
+			Find(&votesWithUsers)
+
 		if voteResult.Error != nil {
 			log.Printf("GetSong: Error loading votes for song %d: %v", id, voteResult.Error)
 		}
 
-		log.Printf("GetSong: Successfully loaded song '%s' with %d votes", song.NameOriginal, len(votes))
+		log.Printf("GetSong: Successfully loaded song '%s' with %d votes", song.NameOriginal, len(votesWithUsers))
 		log.Printf("%v\n", song)
 
 		// Convert song to JSON for JavaScript color initialization
@@ -110,9 +122,17 @@ func GetSong(db *gorm.DB) gin.HandlerFunc {
 		templateData := GetUserContext(c)
 		templateData["title"] = song.NameOriginal
 		templateData["song"] = song
-		templateData["votes"] = votes
+		templateData["votes"] = votesWithUsers
 		templateData["songJSON"] = string(songJSON)
 		templateData["embedURL"] = embedURL
+
+		// Check if current user has voted for this song
+		if userID, exists := c.Get("user_id"); exists && userID != nil {
+			var userVote models.Vote
+			if err := db.Where("user_id = ? AND song_id = ?", userID, id).First(&userVote).Error; err == nil {
+				templateData["user_vote"] = userVote
+			}
+		}
 
 		c.HTML(http.StatusOK, "song.html", templateData)
 	}
@@ -120,10 +140,88 @@ func GetSong(db *gorm.DB) gin.HandlerFunc {
 
 func PostVote(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// TODO: Add authentication middleware first
-		// For now, this is a placeholder
-		c.JSON(http.StatusNotImplemented, gin.H{
-			"error": "Voting not implemented yet - need authentication",
-		})
+		// Check if user is authenticated
+		userID, exists := c.Get("user_id")
+		if !exists || userID == nil {
+			c.Redirect(http.StatusFound, "/login")
+			return
+		}
+
+		// Get song ID from URL
+		songIDParam := c.Param("id")
+		songID, err := strconv.ParseUint(songIDParam, 10, 32)
+		if err != nil {
+			c.HTML(http.StatusBadRequest, "error.html", gin.H{
+				"title": "SyncRate | Error",
+				"error": "Invalid song ID",
+			})
+			return
+		}
+
+		// Verify song exists
+		var song models.Song
+		if err := db.First(&song, uint(songID)).Error; err != nil {
+			c.HTML(http.StatusNotFound, "error.html", gin.H{
+				"title": "SyncRate | Error",
+				"error": "Song not found",
+			})
+			return
+		}
+
+		// Get form data
+		ratingStr := c.PostForm("rating")
+		comment := strings.TrimSpace(c.PostForm("comment"))
+
+		// Validate rating
+		rating, err := strconv.Atoi(ratingStr)
+		if err != nil || rating < 1 || rating > 10 {
+			c.HTML(http.StatusBadRequest, "error.html", gin.H{
+				"title": "SyncRate | Error",
+				"error": "Rating must be a number between 1 and 10",
+			})
+			return
+		}
+
+		// Check if user already voted for this song
+		var existingVote models.Vote
+		result := db.Where("user_id = ? AND song_id = ?", userID, uint(songID)).First(&existingVote)
+
+		if result.Error == nil {
+			// Update existing vote
+			existingVote.Rating = rating
+			existingVote.Comment = comment
+			if err := db.Save(&existingVote).Error; err != nil {
+				c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+					"title": "SyncRate | Error",
+					"error": "Failed to update vote",
+				})
+				return
+			}
+		} else if result.Error == gorm.ErrRecordNotFound {
+			// Create new vote
+			vote := models.Vote{
+				UserID:  userID.(uint),
+				SongID:  uint(songID),
+				Rating:  rating,
+				Comment: comment,
+			}
+			if err := db.Create(&vote).Error; err != nil {
+				c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+					"title": "SyncRate | Error",
+					"error": "Failed to create vote",
+				})
+				return
+			}
+		} else {
+			// Database error
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+				"title": "SyncRate | Error",
+				"error": "Database error",
+			})
+			return
+		}
+
+		// Redirect back to song page
+		c.Redirect(http.StatusFound, "/songs/"+songIDParam)
 	}
 }

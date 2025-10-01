@@ -61,34 +61,48 @@
             />
             {{end}}
 
+            {{if .is_authenticated}}
             <div class="rating-form">
+              {{if .user_vote}}
+              <h4>Update your rating</h4>
+              <p><strong>Your current rating: {{.user_vote.Rating}}/10</strong></p>
+              {{else}}
               <h4>Rate this song</h4>
+              {{end}}
               <form action="/songs/{{.song.SongID}}/vote" method="POST">
                 <select name="rating" required class="form-select">
-                  <option value="" disabled selected hidden>
+                  <option value="" disabled {{if not .user_vote}}selected{{end}} hidden>
                     Select rating...
                   </option>
-                  <option value="1">1 - Terrible</option>
-                  <option value="2">2 - Poor</option>
-                  <option value="3">3 - Below Average</option>
-                  <option value="4">4 - Fair</option>
-                  <option value="5">5 - Average</option>
-                  <option value="6">6 - Above Average</option>
-                  <option value="7">7 - Good</option>
-                  <option value="8">8 - Very Good</option>
-                  <option value="9">9 - Excellent</option>
-                  <option value="10">10 - Perfect</option>
+                  <option value="1" {{if and .user_vote (eq .user_vote.Rating 1)}}selected{{end}}>1 - Terrible</option>
+                  <option value="2" {{if and .user_vote (eq .user_vote.Rating 2)}}selected{{end}}>2 - Poor</option>
+                  <option value="3" {{if and .user_vote (eq .user_vote.Rating 3)}}selected{{end}}>3 - Below Average</option>
+                  <option value="4" {{if and .user_vote (eq .user_vote.Rating 4)}}selected{{end}}>4 - Fair</option>
+                  <option value="5" {{if and .user_vote (eq .user_vote.Rating 5)}}selected{{end}}>5 - Average</option>
+                  <option value="6" {{if and .user_vote (eq .user_vote.Rating 6)}}selected{{end}}>6 - Above Average</option>
+                  <option value="7" {{if and .user_vote (eq .user_vote.Rating 7)}}selected{{end}}>7 - Good</option>
+                  <option value="8" {{if and .user_vote (eq .user_vote.Rating 8)}}selected{{end}}>8 - Very Good</option>
+                  <option value="9" {{if and .user_vote (eq .user_vote.Rating 9)}}selected{{end}}>9 - Excellent</option>
+                  <option value="10" {{if and .user_vote (eq .user_vote.Rating 10)}}selected{{end}}>10 - Perfect</option>
                 </select>
                 <textarea
                   name="comment"
                   placeholder="Optional comment..."
                   class="form-textarea"
-                ></textarea>
+                >{{if .user_vote}}{{.user_vote.Comment}}{{end}}</textarea>
                 <button type="submit" class="btn-secondary">
-                  Submit Rating
+                  {{if .user_vote}}Update Rating{{else}}Submit Rating{{end}}
                 </button>
               </form>
             </div>
+            {{else}}
+            <div class="rating-form">
+              <h4>Rate this song</h4>
+              <p style="color: #666; margin: 10px 0;">
+                <a href="/login">Login</a> to rate this song
+              </p>
+            </div>
+            {{end}}
           </div>
         </div>
 
@@ -98,7 +112,7 @@
           {{range .votes}}
           <div class="vote-card">
             <div class="vote-header">
-              <strong>{{.User.Username}}</strong>
+              <strong>{{.Username}}</strong>
               <span class="vote-rating">{{.Rating}}/10</span>
             </div>
             {{if .Comment}}
