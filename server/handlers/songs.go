@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/CptPie/SyncRate/models"
+	"github.com/CptPie/SyncRate/server/utils"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -89,10 +90,29 @@ func GetSong(db *gorm.DB) gin.HandlerFunc {
 
 		log.Printf("%v\n", song)
 
+		// Convert song to JSON for JavaScript color initialization
+		// Wrap in array to match the format expected by artist-colors.js
+		songsArray := []models.Song{song}
+		songJSON, err := json.Marshal(songsArray)
+		if err != nil {
+			log.Printf("GetSong: Error marshaling song JSON: %v", err)
+			songJSON = []byte("[]") // Empty array fallback
+		}
+
+		// Generate YouTube embed URL if source is a YouTube URL
+		var embedURL string
+		if song.SourceURL != "" {
+			if url, err := utils.GetYouTubeEmbedURL(song.SourceURL); err == nil {
+				embedURL = url
+			}
+		}
+
 		c.HTML(http.StatusOK, "song.html", gin.H{
-			"title": song.NameOriginal,
-			"song":  song,
-			"votes": votes,
+			"title":    song.NameOriginal,
+			"song":     song,
+			"votes":    votes,
+			"songJSON": string(songJSON),
+			"embedURL": embedURL,
 		})
 	}
 }

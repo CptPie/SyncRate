@@ -77,3 +77,17 @@ func ExtractYouTubeThumbnail(sourceURL string) (string, error) {
 
 	return GetYouTubeThumbnailURL(videoID)
 }
+
+// GetYouTubeEmbedURL converts a YouTube URL to its embed format
+func GetYouTubeEmbedURL(sourceURL string) (string, error) {
+	if !IsYouTubeURL(sourceURL) {
+		return "", fmt.Errorf("not a YouTube URL")
+	}
+
+	videoID, err := YouTubeVideoID(sourceURL)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("https://www.youtube.com/embed/%s", videoID), nil
+}

@@ -2,16 +2,13 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{{.title}}</title>
-    <link href="/static/css/style.css" rel="stylesheet" />
+    {{template "head" .}}
   </head>
   <body>
     <div class="container">
       {{template "header" .}}
       <main>
-        <div class="song-detail-layout">
+        <div class="song-detail-layout" data-song-id="{{.song.SongID}}">
           <div class="song-info">
             <h2>{{.song.NameOriginal}}</h2>
             {{if .song.NameEnglish}}
@@ -19,31 +16,39 @@
               {{.song.NameEnglish}}
             </h3>
             {{end}} {{if .song.Artists}}
-            <p>
-              <strong>Artists:</strong>
-              {{range $index, $songArtist := .song.Artists}} {{if $index}},
-              {{end}}{{$songArtist.NameOriginal}} {{end}}
-            </p>
-            {{end}} {{if .song.Category}}
-            <p>
-              <strong>Category:</strong>
+            <div class="artist">
+              {{if eq (len .song.Artists) 1}}Artist{{else}}Artists{{end}}:
+              {{range $index, $songArtist := .song.Artists}} {{if $index}}, {{end}}<span class="artist-name">{{$songArtist.NameOriginal}}</span> {{end}}
+            </div>
+            {{end}}
+
+            {{if .song.Units}}
+            <div class="units">
+              {{if eq (len .song.Units) 1}}Group{{else}}Groups{{end}}:
+              {{range $index, $songUnit := .song.Units}} {{if $index}}, {{end}}<span class="unit-name">{{$songUnit.NameOriginal}}</span> {{end}}
+            </div>
+            {{end}}
+
+            {{if or .song.Category .song.IsCover}}
+            <div class="categories">
+              Tags:
+              {{if .song.Category}}
               <span class="category">{{.song.Category.Name}}</span>
-            </p>
-            {{end}} {{if .song.IsCover}}
-            <p>
-              <span class="category" style="background: #28a745"
-                >Cover Version</span
-              >
-            </p>
-            {{end}} {{if .song.SourceURL}}
-            <p>
-              <a
-                href="{{.song.SourceURL}}"
-                target="_blank"
-                style="color: #007bff"
-                >Listen on Source Platform</a
-              >
-            </p>
+              {{end}} {{if .song.IsCover}}
+              <span class="category" style="background: #28a745">Cover</span>
+              {{end}}
+            </div>
+            {{end}}
+
+            {{if .embedURL}}
+            <div class="youtube-embed">
+              <iframe
+                src="{{.embedURL}}"
+                frameborder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen>
+              </iframe>
+            </div>
             {{end}}
           </div>
 
@@ -110,6 +115,27 @@
       </main>
     </div>
     <script src="/static/js/theme-toggle.js"></script>
+    <script src="/static/js/artist-colors.js"></script>
+    <script>
+      // Initialize colors for the single song
+      try {
+        const songJSON = '{{.songJSON}}';
+        if (songJSON && songJSON.trim() !== '') {
+          const songData = JSON.parse(songJSON);
+
+          // Initialize artist and unit colors when page loads
+          document.addEventListener('DOMContentLoaded', function() {
+            if (songData && songData.length > 0) {
+              initializeAllColors(songData);
+            }
+          });
+        } else {
+          console.log('No song JSON data available for color initialization');
+        }
+      } catch (e) {
+        console.error('Error parsing song JSON:', e);
+      }
+    </script>
   </body>
 </html>
 {{end}}
