@@ -1,0 +1,344 @@
+{{define "rating-room.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {{template "head" .}}
+</head>
+<body>
+    <div class="container">
+        {{template "header" .}}
+        <main>
+            <div class="rating-room">
+                <div class="room-header">
+                    <h2>Rating Room: {{.room_id}}</h2>
+                    <div class="room-controls">
+                        <button id="next-song-btn" class="btn-primary">Next Song</button>
+                        <button id="leave-room-btn" class="btn-secondary">Leave Room</button>
+                    </div>
+                </div>
+
+                <div class="room-content">
+                    <!-- Left side: Video and Song Info -->
+                    <div class="video-section">
+                        <div id="video-container" class="video-container">
+                            <div id="no-video" class="no-video">
+                                <p>🎵 Waiting for first song...</p>
+                            </div>
+                        </div>
+
+                        <div id="song-info" class="song-info" style="display: none;">
+                            <h3 id="song-title">Song Title</h3>
+                            <div class="song-details">
+                                <span id="song-artists">Artists</span>
+                                <span class="separator">•</span>
+                                <span id="song-category">Category</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right side: Voting and Users -->
+                    <div class="sidebar">
+                        <!-- Voting Section -->
+                        <div id="voting-section" class="voting-section">
+                            <h4 id="voting-title">Waiting for song...</h4>
+                            <form id="vote-form" style="display: none;">
+                                <div class="rating-input">
+                                    <label for="rating">Rating:</label>
+                                    <select id="rating" required class="form-select">
+                                        <option value="" disabled selected hidden>Select rating...</option>
+                                        <option value="1">1 - Terrible</option>
+                                        <option value="2">2 - Poor</option>
+                                        <option value="3">3 - Below Average</option>
+                                        <option value="4">4 - Fair</option>
+                                        <option value="5">5 - Average</option>
+                                        <option value="6">6 - Above Average</option>
+                                        <option value="7">7 - Good</option>
+                                        <option value="8">8 - Very Good</option>
+                                        <option value="9">9 - Excellent</option>
+                                        <option value="10">10 - Perfect</option>
+                                    </select>
+                                </div>
+                                <div class="comment-input">
+                                    <label for="comment">Comment (optional):</label>
+                                    <textarea id="comment" placeholder="Your thoughts on this song..." class="form-textarea"></textarea>
+                                </div>
+                                <button type="submit" class="btn-primary">Submit Vote</button>
+                            </form>
+
+                            <div id="no-song-message" class="no-song-message">
+                                <p>🎵 No song is currently playing</p>
+                                <p>Click "Next Song" to start rating!</p>
+                            </div>
+
+                            <div id="current-vote" class="current-vote" style="display: none;">
+                                <h5>Your Vote:</h5>
+                                <div class="vote-display">
+                                    <span class="vote-rating"></span>
+                                    <span class="vote-comment"></span>
+                                </div>
+                                <button id="change-vote-btn" class="btn-secondary">Change Vote</button>
+                            </div>
+                        </div>
+
+                        <!-- Users Section -->
+                        <div class="users-section">
+                            <h4>Room Members</h4>
+                            <div id="users-list" class="users-list">
+                                <!-- Users will be populated via WebSocket -->
+                            </div>
+                        </div>
+
+                        <!-- Votes Section -->
+                        <div id="votes-section" class="votes-section">
+                            <h4>All Votes</h4>
+                            <div id="votes-list" class="votes-list">
+                                <p class="no-votes">No votes yet for this song</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/theme-toggle.js"></script>
+    <script>
+        class RatingRoom {
+            constructor(roomId) {
+                this.roomId = roomId;
+                this.ws = null;
+                this.currentSongId = null;
+                this.userVotes = new Map();
+                this.hasVoted = false;
+
+                this.initWebSocket();
+                this.initEventListeners();
+            }
+
+            initWebSocket() {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/rating-room/${this.roomId}/ws`;
+
+                this.ws = new WebSocket(wsUrl);
+
+                this.ws.onopen = () => {
+                    console.log('Connected to rating room');
+                };
+
+                this.ws.onmessage = (event) => {
+                    const message = JSON.parse(event.data);
+                    this.handleMessage(message);
+                };
+
+                this.ws.onclose = () => {
+                    console.log('Disconnected from rating room');
+                    // Could add reconnection logic here
+                };
+
+                this.ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                };
+            }
+
+            initEventListeners() {
+                // Next song button
+                document.getElementById('next-song-btn').addEventListener('click', () => {
+                    this.sendMessage('next_song', {});
+                });
+
+                // Leave room button
+                document.getElementById('leave-room-btn').addEventListener('click', () => {
+                    window.location.href = '/';
+                });
+
+                // Vote form
+                document.getElementById('vote-form').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.submitVote();
+                });
+
+                // Change vote button
+                document.getElementById('change-vote-btn').addEventListener('click', () => {
+                    this.showVoteForm();
+                });
+            }
+
+            handleMessage(message) {
+                switch (message.type) {
+                    case 'song_change':
+                        this.handleSongChange(message.data);
+                        break;
+                    case 'video_sync':
+                        this.handleVideoSync(message.data);
+                        break;
+                    case 'vote_update':
+                        this.handleVoteUpdate(message.data);
+                        break;
+                    case 'user_update':
+                        this.handleUserUpdate(message.data);
+                        break;
+                    case 'error':
+                        console.error('Room error:', message.error);
+                        break;
+                }
+            }
+
+            handleSongChange(data) {
+                this.currentSongId = data.song_id;
+                this.hasVoted = false;
+                this.userVotes.clear();
+
+                // Update song info
+                document.getElementById('song-title').textContent = data.song_title;
+                document.getElementById('song-info').style.display = 'block';
+
+                // Update video
+                if (data.embed_url) {
+                    const videoContainer = document.getElementById('video-container');
+                    const noVideoElement = document.getElementById('no-video');
+
+                    if (noVideoElement) {
+                        noVideoElement.style.display = 'none';
+                    }
+
+                    videoContainer.innerHTML = `
+                        <iframe id="video-player"
+                                src="${data.embed_url}"
+                                frameborder="0"
+                                allowfullscreen>
+                        </iframe>
+                    `;
+                }
+
+                // Show voting section
+                document.getElementById('voting-title').textContent = 'Rate This Song';
+                document.getElementById('no-song-message').style.display = 'none';
+                this.showVoteForm();
+
+                // Clear previous votes
+                document.getElementById('votes-list').innerHTML = '<p class="no-votes">No votes yet for this song</p>';
+            }
+
+            handleVideoSync(data) {
+                // Handle video synchronization if needed
+                // Could sync video time and play state
+                console.log('Video sync:', data);
+            }
+
+            handleVoteUpdate(data) {
+                this.userVotes.set(data.user_id, {
+                    username: data.username,
+                    rating: data.rating,
+                    comment: data.comment
+                });
+
+                // Check if this is our vote
+                if (data.user_id === this.getCurrentUserId()) {
+                    this.hasVoted = true;
+                    this.showCurrentVote(data.rating, data.comment);
+                }
+
+                this.updateVotesList();
+            }
+
+            handleUserUpdate(data) {
+                const usersList = document.getElementById('users-list');
+                usersList.innerHTML = '';
+
+                data.users.forEach(user => {
+                    const userElement = document.createElement('div');
+                    userElement.className = 'user-item';
+                    userElement.innerHTML = `
+                        <span class="username">${user.username}</span>
+                        <span class="user-status ${this.userVotes.has(user.id) ? 'voted' : 'pending'}">
+                            ${this.userVotes.has(user.id) ? '✓' : '⏳'}
+                        </span>
+                    `;
+                    usersList.appendChild(userElement);
+                });
+            }
+
+            submitVote() {
+                const rating = parseInt(document.getElementById('rating').value);
+                const comment = document.getElementById('comment').value;
+
+                const voteData = {
+                    user_id: this.getCurrentUserId(),
+                    username: this.getCurrentUsername(),
+                    rating: rating,
+                    comment: comment
+                };
+
+                this.sendMessage('vote_update', voteData);
+            }
+
+            showVoteForm() {
+                document.getElementById('vote-form').style.display = 'block';
+                document.getElementById('current-vote').style.display = 'none';
+
+                // Reset form
+                document.getElementById('rating').value = '';
+                document.getElementById('comment').value = '';
+            }
+
+            showCurrentVote(rating, comment) {
+                document.getElementById('vote-form').style.display = 'none';
+                document.getElementById('current-vote').style.display = 'block';
+
+                document.querySelector('.vote-rating').textContent = `Rating: ${rating}/10`;
+                document.querySelector('.vote-comment').textContent = comment || 'No comment';
+            }
+
+            updateVotesList() {
+                const votesList = document.getElementById('votes-list');
+                votesList.innerHTML = '';
+
+                if (this.userVotes.size === 0) {
+                    votesList.innerHTML = '<p class="no-votes">No votes yet for this song</p>';
+                    return;
+                }
+
+                for (const [userId, vote] of this.userVotes) {
+                    const voteElement = document.createElement('div');
+                    voteElement.className = 'vote-item';
+                    voteElement.innerHTML = `
+                        <div class="vote-header">
+                            <span class="voter-name">${vote.username}</span>
+                            <span class="vote-rating">${vote.rating}/10</span>
+                        </div>
+                        ${vote.comment ? `<div class="vote-comment">${vote.comment}</div>` : ''}
+                    `;
+                    votesList.appendChild(voteElement);
+                }
+            }
+
+            sendMessage(type, data) {
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.send(JSON.stringify({
+                        type: type,
+                        data: data,
+                        timestamp: new Date().toISOString()
+                    }));
+                }
+            }
+
+            getCurrentUserId() {
+                // This should be injected from the template
+                return '{{.user_id}}';
+            }
+
+            getCurrentUsername() {
+                // This should be injected from the template
+                return '{{.username}}';
+            }
+        }
+
+        // Initialize rating room when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            const roomId = '{{.room_id}}';
+            window.ratingRoom = new RatingRoom(roomId);
+        });
+    </script>
+</body>
+</html>
+{{end}}

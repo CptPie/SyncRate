@@ -65,6 +65,12 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	r.POST("/register", handlers.PostRegister(db))
 	r.POST("/logout", handlers.PostLogout(db))
 
+	// Rating room routes
+	r.GET("/create-rating-room", handlers.GetCreateRatingRoom(db))
+	r.POST("/create-rating-room", handlers.PostCreateRatingRoom(db))
+	r.GET("/rating-room/:roomId", handlers.GetRatingRoom(db))
+	r.GET("/rating-room/:roomId/ws", handlers.GetRatingRoomWS(db))
+
 	// Admin routes (protected)
 	admin := r.Group("/admin")
 	admin.Use(middleware.RequireAuth())

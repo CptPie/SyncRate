@@ -36,11 +36,11 @@ func IsYouTubeURL(url string) bool {
 func GetYouTubeThumbnailURL(videoID string) (string, error) {
 	// YouTube thumbnail resolutions in order of preference (highest to lowest)
 	resolutions := []string{
-		"maxresdefault",  // 1280x720
-		"sddefault",      // 640x480
-		"hqdefault",      // 480x360
-		"mqdefault",      // 320x180
-		"default",        // 120x90
+		"maxresdefault", // 1280x720
+		"sddefault",     // 640x480
+		"hqdefault",     // 480x360
+		"mqdefault",     // 320x180
+		"default",       // 120x90
 	}
 
 	for _, resolution := range resolutions {
@@ -91,3 +91,4 @@ func GetYouTubeEmbedURL(sourceURL string) (string, error) {
 
 	return fmt.Sprintf("https://www.youtube.com/embed/%s", videoID), nil
 }
+

@@ -1,0 +1,124 @@
+{{define "create-rating-room.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {{template "head" .}}
+</head>
+<body>
+    <div class="container">
+        {{template "header" .}}
+        <main>
+            <div class="form-container">
+                <h2>Create Rating Room</h2>
+                <p>Create a collaborative rating room where you and your friends can rate songs together in real-time!</p>
+
+                <div class="room-info">
+                    <h3>How it works:</h3>
+                    <ul>
+                        <li>🎵 View and rate songs together with friends</li>
+                        <li>🔄 Synced video playback for everyone</li>
+                        <li>⭐ Each person can vote on the current song</li>
+                        <li>➡️ Use the "Next" button to advance songs</li>
+                        <li>🔗 Share the room code with others to join</li>
+                    </ul>
+                </div>
+
+                <button id="create-room-btn" class="btn-primary">
+                    Create Rating Room
+                </button>
+
+                <div id="room-result" class="room-result" style="display: none;">
+                    <h3>Room Created!</h3>
+                    <div class="room-details">
+                        <div class="room-code-section">
+                            <label>Room Code:</label>
+                            <div class="room-code" id="room-code"></div>
+                            <button id="copy-code-btn" class="btn-secondary">Copy Code</button>
+                        </div>
+                        <div class="room-url-section">
+                            <label>Share URL:</label>
+                            <div class="room-url" id="room-url"></div>
+                            <button id="copy-url-btn" class="btn-secondary">Copy URL</button>
+                        </div>
+                        <a id="join-room-link" class="btn-primary">Join Room</a>
+                    </div>
+                </div>
+
+                <div id="error-message" class="error-message" style="display: none;"></div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/theme-toggle.js"></script>
+    <script>
+        document.getElementById('create-room-btn').addEventListener('click', async function() {
+            const btn = this;
+            btn.disabled = true;
+            btn.textContent = 'Creating...';
+
+            try {
+                const response = await fetch('/create-rating-room', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Show success result
+                    document.getElementById('room-code').textContent = data.room_id;
+                    document.getElementById('room-url').textContent = window.location.origin + data.url;
+                    document.getElementById('join-room-link').href = data.url;
+                    document.getElementById('room-result').style.display = 'block';
+                    document.getElementById('error-message').style.display = 'none';
+                } else {
+                    // Show error
+                    document.getElementById('error-message').textContent = data.error || 'Failed to create room';
+                    document.getElementById('error-message').style.display = 'block';
+                    document.getElementById('room-result').style.display = 'none';
+                }
+            } catch (error) {
+                document.getElementById('error-message').textContent = 'Network error occurred';
+                document.getElementById('error-message').style.display = 'block';
+                document.getElementById('room-result').style.display = 'none';
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Create Rating Room';
+        });
+
+        // Copy functionality
+        function copyRoomCode() {
+            const roomCode = document.getElementById('room-code').textContent;
+            navigator.clipboard.writeText(roomCode).then(() => {
+                const btn = document.getElementById('copy-code-btn');
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.textContent = 'Copy Code';
+                }, 2000);
+            });
+        }
+
+        function copyRoomUrl() {
+            const roomUrl = document.getElementById('room-url').textContent;
+            navigator.clipboard.writeText(roomUrl).then(() => {
+                const btn = document.getElementById('copy-url-btn');
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.textContent = 'Copy URL';
+                }, 2000);
+            });
+        }
+
+        document.getElementById('copy-code-btn').addEventListener('click', copyRoomCode);
+        document.getElementById('copy-url-btn').addEventListener('click', copyRoomUrl);
+
+        // Enable copying by clicking on the text fields
+        document.getElementById('room-code').addEventListener('click', copyRoomCode);
+        document.getElementById('room-url').addEventListener('click', copyRoomUrl);
+    </script>
+</body>
+</html>
+{{end}}
