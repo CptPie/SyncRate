@@ -1,0 +1,12 @@
+<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="8" cy="8" r="7.5" fill="#5e81ac" stroke="#88c0d0" stroke-width="1"/>
+
+  <!-- Musical note -->
+  <ellipse cx="6" cy="11" rx="1.5" ry="1" fill="#eceff4"/>
+  <rect x="7.25" y="5" width="0.75" height="6" fill="#eceff4"/>
+  <path d="M8 5 Q9 4 11 4.5 L11 7.5 Q10 7 9 7.5 L8 8 Z" fill="#eceff4"/>
+
+  <!-- Rating star -->
+  <path d="M12 6 L12.75 7.5 L14.5 7.5 L13.25 8.5 L13.75 10.25 L12 9.25 L10.25 10.25 L10.75 8.5 L9.5 7.5 L11.25 7.5 Z" fill="#d08770" stroke="#bf616a" stroke-width="0.25"/>
+</svg>
