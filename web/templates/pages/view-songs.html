@@ -52,20 +52,16 @@
               <p><strong>Type:</strong> Cover Version</p>
               {{end}}
               {{if .Artists}}
-              <p><strong>Artists:</strong></p>
-              <ul class="member-list">
-                {{range .Artists}}
-                <li><span class="artist-name">{{.NameOriginal}}</span></li>
-                {{end}}
-              </ul>
+              <div class="artist">
+                {{if eq (len .Artists) 1}}Artist{{else}}Artists{{end}}:
+                {{range $index, $songArtist := .Artists}} {{if $index}}, {{end}}<span class="artist-name">{{$songArtist.NameOriginal}}</span> {{end}}
+              </div>
               {{end}}
               {{if .Units}}
-              <p><strong>Units:</strong></p>
-              <ul class="member-list">
-                {{range .Units}}
-                <li><span class="unit-name">{{.NameOriginal}}</span></li>
-                {{end}}
-              </ul>
+              <div class="units">
+                {{if eq (len .Units) 1}}Group{{else}}Groups{{end}}:
+                {{range $index, $songUnit := .Units}} {{if $index}}, {{end}}<span class="unit-name">{{$songUnit.NameOriginal}}</span> {{end}}
+              </div>
               {{end}}
               <p><strong>Source:</strong> <a href="{{.SourceURL}}" target="_blank" rel="noopener">{{.SourceURL}}</a></p>
               <p><strong>ID:</strong> {{.SongID}}</p>
