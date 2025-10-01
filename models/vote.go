@@ -11,9 +11,6 @@ type Vote struct {
 	Rating  int  `gorm:"check:rating >= 1 AND rating <= 10"`
 	Comment string
 
-	// Relationships
-	User User `gorm:"foreignKey:UserID"`
-
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt time.Time
