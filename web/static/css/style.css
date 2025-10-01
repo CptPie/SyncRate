@@ -673,11 +673,26 @@ input[type="color"]:focus {
   height: 16px; /* Reserve space so both columns have same height */
 }
 
-/* Ensure filter group has matching height */
-.filter-group::after {
-  content: "";
+
+/* Checkbox styling for filters */
+.filter-group .form-checkbox {
+  margin-right: 8px;
+  accent-color: var(--accent-primary);
+  transform: scale(1.1);
+}
+
+.filter-group label input[type="checkbox"] {
+  margin-right: 8px;
+}
+
+/* Covers filter positioning */
+.covers-filter-label {
   display: block;
-  height: 24px; /* Match search-stats height + margin */
+  margin-top: 8px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
 }
 
 .no-results {
