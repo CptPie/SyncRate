@@ -12,6 +12,9 @@
       <select id="category-filter" class="filter-select">
         <option value="">All Categories</option>
       </select>
+      <label class="covers-filter-label">
+        <input type="checkbox" id="covers-filter" class="form-checkbox"> Covers Only
+      </label>
     </div>
   </div>
 </div>
@@ -37,6 +40,7 @@ function initializeSongsSearch() {
   const searchFilter = new FuzzySearchFilter({
     searchInputId: 'song-search',
     categoryFilterId: 'category-filter',
+    coversFilterId: 'covers-filter',
     itemsContainerId: 'songs-container',
     itemClass: '{{if .isAdminPage}}view-card{{else}}song-card{{end}}',
     noResultsId: 'no-results',

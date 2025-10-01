@@ -3,6 +3,7 @@ class SearchFilter {
     constructor(options) {
         this.searchInputId = options.searchInputId;
         this.categoryFilterId = options.categoryFilterId;
+        this.coversFilterId = options.coversFilterId;
         this.itemsContainerId = options.itemsContainerId;
         this.itemClass = options.itemClass;
         this.noResultsId = options.noResultsId;
@@ -13,6 +14,7 @@ class SearchFilter {
         this.filteredData = [...this.data];
         this.currentSearchTerm = '';
         this.currentCategoryFilter = '';
+        this.currentCoversFilter = false;
 
         this.init();
     }
@@ -26,6 +28,7 @@ class SearchFilter {
     setupEventListeners() {
         const searchInput = document.getElementById(this.searchInputId);
         const categoryFilter = document.getElementById(this.categoryFilterId);
+        const coversFilter = document.getElementById(this.coversFilterId);
 
         if (searchInput) {
             searchInput.addEventListener('input', (e) => {
@@ -37,6 +40,13 @@ class SearchFilter {
         if (categoryFilter) {
             categoryFilter.addEventListener('change', (e) => {
                 this.currentCategoryFilter = e.target.value;
+                this.filterAndRender();
+            });
+        }
+
+        if (coversFilter) {
+            coversFilter.addEventListener('change', (e) => {
+                this.currentCoversFilter = e.target.checked;
                 this.filterAndRender();
             });
         }
@@ -60,7 +70,7 @@ class SearchFilter {
 
     filterAndRender() {
         this.filteredData = this.data.filter(item => {
-            return this.matchesSearch(item) && this.matchesCategory(item);
+            return this.matchesSearch(item) && this.matchesCategory(item) && this.matchesCovers(item);
         });
 
         this.renderItems();
@@ -97,6 +107,13 @@ class SearchFilter {
         // Check if item has a category and it matches the filter
         const categoryId = item.Category?.CategoryID || item.CategoryID;
         return categoryId && categoryId.toString() === this.currentCategoryFilter;
+    }
+
+    matchesCovers(item) {
+        if (!this.currentCoversFilter) return true;
+
+        // When covers filter is enabled, only show covers (IsCover = true)
+        return item.IsCover === true;
     }
 
     getNestedValue(obj, path) {
