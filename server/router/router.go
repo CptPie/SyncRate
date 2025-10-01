@@ -12,6 +12,9 @@ import (
 func SetupRouter(db *gorm.DB) *gin.Engine {
 	r := gin.Default()
 
+	// Configure trusted proxies (disable for direct connections)
+	r.SetTrustedProxies(nil)
+
 	// Load HTML templates with proper parsing
 	log.Println("Loading component templates...")
 	tmpl := template.Must(template.ParseGlob("web/templates/components/*.html"))
