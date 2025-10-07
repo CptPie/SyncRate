@@ -43,10 +43,11 @@ func GetAddCategory(db *gorm.DB) gin.HandlerFunc {
 		var categories []models.Category
 		db.Find(&categories)
 
-		c.HTML(http.StatusOK, "add-category.html", gin.H{
-			"title":      "SyncRate | Add Category",
-			"categories": categories,
-		})
+		templateData := GetUserContext(c)
+		templateData["title"] = "SyncRate | Add Category"
+		templateData["categories"] = categories
+
+		c.HTML(http.StatusOK, "add-category.html", templateData)
 	}
 }
 
@@ -66,14 +67,15 @@ func GetAddUnit(db *gorm.DB) gin.HandlerFunc {
 		categoriesJSON, _ := json.Marshal(categories)
 		artistsJSON, _ := json.Marshal(artists)
 
-		c.HTML(http.StatusOK, "add-unit.html", gin.H{
-			"title":          "SyncRate | Add Unit",
-			"units":          units,
-			"categories":     categories,
-			"artists":        artists,
-			"categoriesJSON": string(categoriesJSON),
-			"artistsJSON":    string(artistsJSON),
-		})
+		templateData := GetUserContext(c)
+		templateData["title"] = "SyncRate | Add Unit"
+		templateData["units"] = units
+		templateData["categories"] = categories
+		templateData["artists"] = artists
+		templateData["categoriesJSON"] = string(categoriesJSON)
+		templateData["artistsJSON"] = string(artistsJSON)
+
+		c.HTML(http.StatusOK, "add-unit.html", templateData)
 	}
 }
 
@@ -93,14 +95,15 @@ func GetAddArtist(db *gorm.DB) gin.HandlerFunc {
 		unitsJSON, _ := json.Marshal(units)
 		categoriesJSON, _ := json.Marshal(categories)
 
-		c.HTML(http.StatusOK, "add-artist.html", gin.H{
-			"title":          "SyncRate | Add Artist",
-			"artists":        artists,
-			"units":          units,
-			"categories":     categories,
-			"unitsJSON":      string(unitsJSON),
-			"categoriesJSON": string(categoriesJSON),
-		})
+		templateData := GetUserContext(c)
+		templateData["title"] = "SyncRate | Add Artist"
+		templateData["artists"] = artists
+		templateData["units"] = units
+		templateData["categories"] = categories
+		templateData["unitsJSON"] = string(unitsJSON)
+		templateData["categoriesJSON"] = string(categoriesJSON)
+
+		c.HTML(http.StatusOK, "add-artist.html", templateData)
 	}
 }
 
@@ -121,15 +124,16 @@ func GetAddSong(db *gorm.DB) gin.HandlerFunc {
 		artistsJSON, _ := json.Marshal(artists)
 		unitsJSON, _ := json.Marshal(units)
 
-		c.HTML(http.StatusOK, "add-song.html", gin.H{
-			"title":          "SyncRate | Add Song",
-			"categories":     categories,
-			"artists":        artists,
-			"units":          units,
-			"categoriesJSON": string(categoriesJSON),
-			"artistsJSON":    string(artistsJSON),
-			"unitsJSON":      string(unitsJSON),
-		})
+		templateData := GetUserContext(c)
+		templateData["title"] = "SyncRate | Add Song"
+		templateData["categories"] = categories
+		templateData["artists"] = artists
+		templateData["units"] = units
+		templateData["categoriesJSON"] = string(categoriesJSON)
+		templateData["artistsJSON"] = string(artistsJSON)
+		templateData["unitsJSON"] = string(unitsJSON)
+
+		c.HTML(http.StatusOK, "add-song.html", templateData)
 	}
 }
 
@@ -302,12 +306,13 @@ func GetViewCategories(db *gorm.DB) gin.HandlerFunc {
 		// Convert to JSON for JavaScript
 		categoriesJSON, _ := json.Marshal(categories)
 
-		c.HTML(http.StatusOK, "view-categories.html", gin.H{
-			"title":          "SyncRate | View Categories",
-			"categories":     categories,
-			"categoriesJSON": string(categoriesJSON),
-			"isAdminPage":    true,
-		})
+		templateData := GetUserContext(c)
+		templateData["title"] = "SyncRate | View Categories"
+		templateData["categories"] = categories
+		templateData["categoriesJSON"] = string(categoriesJSON)
+		templateData["isAdminPage"] = true
+
+		c.HTML(http.StatusOK, "view-categories.html", templateData)
 	}
 }
 
@@ -328,16 +333,17 @@ func GetViewUnits(db *gorm.DB) gin.HandlerFunc {
 		categoriesJSON, _ := json.Marshal(categories)
 		artistsJSON, _ := json.Marshal(artists)
 
-		c.HTML(http.StatusOK, "view-units.html", gin.H{
-			"title":          "SyncRate | View Units",
-			"units":          units,
-			"categories":     categories,
-			"artists":        artists,
-			"unitsJSON":      string(unitsJSON),
-			"categoriesJSON": string(categoriesJSON),
-			"artistsJSON":    string(artistsJSON),
-			"isAdminPage":    true,
-		})
+		templateData := GetUserContext(c)
+		templateData["title"] = "SyncRate | View Units"
+		templateData["units"] = units
+		templateData["categories"] = categories
+		templateData["artists"] = artists
+		templateData["unitsJSON"] = string(unitsJSON)
+		templateData["categoriesJSON"] = string(categoriesJSON)
+		templateData["artistsJSON"] = string(artistsJSON)
+		templateData["isAdminPage"] = true
+
+		c.HTML(http.StatusOK, "view-units.html", templateData)
 	}
 }
 
@@ -358,16 +364,17 @@ func GetViewArtists(db *gorm.DB) gin.HandlerFunc {
 		categoriesJSON, _ := json.Marshal(categories)
 		unitsJSON, _ := json.Marshal(units)
 
-		c.HTML(http.StatusOK, "view-artists.html", gin.H{
-			"title":          "SyncRate | View Artists",
-			"artists":        artists,
-			"categories":     categories,
-			"units":          units,
-			"artistsJSON":    string(artistsJSON),
-			"categoriesJSON": string(categoriesJSON),
-			"unitsJSON":      string(unitsJSON),
-			"isAdminPage":    true,
-		})
+		templateData := GetUserContext(c)
+		templateData["title"] = "SyncRate | View Artists"
+		templateData["artists"] = artists
+		templateData["categories"] = categories
+		templateData["units"] = units
+		templateData["artistsJSON"] = string(artistsJSON)
+		templateData["categoriesJSON"] = string(categoriesJSON)
+		templateData["unitsJSON"] = string(unitsJSON)
+		templateData["isAdminPage"] = true
+
+		c.HTML(http.StatusOK, "view-artists.html", templateData)
 	}
 }
 
@@ -876,18 +883,19 @@ func GetViewSongs(db *gorm.DB) gin.HandlerFunc {
 		artistsJSON, _ := json.Marshal(artists)
 		unitsJSON, _ := json.Marshal(units)
 
-		c.HTML(http.StatusOK, "view-songs.html", gin.H{
-			"title":          "SyncRate | View Songs",
-			"songs":          songs,
-			"categories":     categories,
-			"artists":        artists,
-			"units":          units,
-			"songsJSON":      string(songsJSON),
-			"categoriesJSON": string(categoriesJSON),
-			"artistsJSON":    string(artistsJSON),
-			"unitsJSON":      string(unitsJSON),
-			"isAdminPage":    true,
-		})
+		templateData := GetUserContext(c)
+		templateData["title"] = "SyncRate | View Songs"
+		templateData["songs"] = songs
+		templateData["categories"] = categories
+		templateData["artists"] = artists
+		templateData["units"] = units
+		templateData["songsJSON"] = string(songsJSON)
+		templateData["categoriesJSON"] = string(categoriesJSON)
+		templateData["artistsJSON"] = string(artistsJSON)
+		templateData["unitsJSON"] = string(unitsJSON)
+		templateData["isAdminPage"] = true
+
+		c.HTML(http.StatusOK, "view-songs.html", templateData)
 	}
 }
 
