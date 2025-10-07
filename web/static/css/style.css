@@ -1087,14 +1087,12 @@ input[type="color"]:focus {
   margin-bottom: 10px;
 }
 
-.vote-rating {
+.vote-display .vote-rating {
   display: block;
-  color: var(--accent-primary);
-  font-weight: 600;
   margin-bottom: 5px;
 }
 
-.vote-comment {
+.vote-display .vote-comment {
   display: block;
   color: var(--text-secondary);
   font-style: italic;
@@ -1188,18 +1186,6 @@ input[type="color"]:focus {
 .voter-name {
   color: var(--text-primary);
   font-weight: 500;
-}
-
-.vote-rating {
-  color: var(--accent-primary);
-  font-weight: 600;
-}
-
-.vote-comment {
-  color: var(--text-secondary);
-  font-size: 14px;
-  font-style: italic;
-  margin-top: 5px;
 }
 
 /* Responsive Design */

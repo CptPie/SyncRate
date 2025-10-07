@@ -134,7 +134,6 @@ func GetSong(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		log.Printf("GetSong: Successfully loaded song '%s' with %d votes", song.NameOriginal, len(votesWithUsers))
-		log.Printf("%v\n", song)
 
 		// Convert song to JSON for JavaScript color initialization
 		// Wrap in array to match the format expected by artist-colors.js
@@ -181,9 +180,15 @@ func GetSong(db *gorm.DB) gin.HandlerFunc {
 		// Check if current user has voted for this song
 		if userID, exists := c.Get("user_id"); exists && userID != nil {
 			var userVote models.Vote
-			if err := db.Where("user_id = ? AND song_id = ?", userID, id).First(&userVote).Error; err == nil {
+			// Use Find instead of First to avoid "record not found" errors in logs
+			result := db.Where("user_id = ? AND song_id = ?", userID, id).Limit(1).Find(&userVote)
+			if result.Error != nil {
+				log.Printf("GetSong: Error checking user vote: %v", result.Error)
+			} else if result.RowsAffected > 0 {
+				// User has voted - include the vote in template data
 				templateData["user_vote"] = userVote
 			}
+			// If RowsAffected == 0, user hasn't voted yet, which is fine
 		}
 
 		c.HTML(http.StatusOK, "song.html", templateData)

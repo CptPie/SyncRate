@@ -224,13 +224,19 @@ func (db *Database) GetAverageRatingForSong(songID uint) (float64, error) {
 		return 0, errors.New("song does not exist")
 	}
 
-	var avgRating float64
+	var avgRating *float64
 	if err := db.DB.Model(&models.Vote{}).
 		Where("song_id = ?", songID).
 		Select("AVG(rating)").Scan(&avgRating).Error; err != nil {
 		return 0, fmt.Errorf("failed to calculate average rating: %w", err)
 	}
-	return avgRating, nil
+
+	// If no votes exist, AVG returns NULL, so avgRating will be nil
+	if avgRating == nil {
+		return 0, nil
+	}
+
+	return *avgRating, nil
 }
 
 func (db *Database) GetVoteCountForSong(songID uint) (int64, error) {
