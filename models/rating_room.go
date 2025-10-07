@@ -11,5 +11,5 @@ type RatingRoom struct {
 
 	// Relationships
 	Creator     User  `gorm:"foreignKey:CreatorID;references:UserID"`
-	CurrentSong *Song `gorm:"foreignKey:CurrentSongID;references:SongID"`
+	CurrentSong *Song `gorm:"foreignKey:CurrentSongID;references:SongID;constraint:OnDelete:SET NULL"`
 }
