@@ -1,0 +1,87 @@
+{{define "add-album.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {{template "head" .}}
+</head>
+<body>
+    <div class="container">
+        {{template "header" .}}
+        <main>
+            <div class="admin-header">
+                <h2>Add Album</h2>
+                <a href="/admin" class="btn-secondary">← Back to Admin</a>
+            </div>
+
+            <div class="form-container">
+                <form action="/admin/add-album" method="POST">
+                    <div class="form-group">
+                        <label for="name_original" class="form-label">Album Name (original):</label>
+                        <input type="text" id="name_original" name="name_original" required class="form-input" placeholder="e.g., THE IDOLM@STER">
+                    </div>
+                    <div class="form-group">
+                        <label for="name_english" class="form-label">Translated Name (optional):</label>
+                        <input type="text" id="name_english" name="name_english" class="form-input" placeholder="e.g., The Idolmaster">
+                    </div>
+                    <div class="form-group">
+                        <label for="album_art_url" class="form-label">Album Art URL (optional):</label>
+                        <input type="url" id="album_art_url" name="album_art_url" class="form-input" placeholder="https://...">
+                    </div>
+                    <div class="form-group">
+                        <label for="type" class="form-label">Type:</label>
+                        <select id="type" name="type" class="form-input">
+                            <option value="">Select type...</option>
+                            <option value="Album">Album</option>
+                            <option value="Single">Single</option>
+                            <option value="EP">EP</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="category" class="form-label">Category (optional):</label>
+                        <div class="fuzzy-search-container">
+                            <input type="text" id="category-search" class="form-input fuzzy-search" placeholder="Search for category..." autocomplete="off">
+                            <div class="fuzzy-dropdown" id="category-dropdown"></div>
+                            <div class="selected-items" id="selected-category"></div>
+                            <input type="hidden" name="category_id" id="category-id">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-primary">Add Album</button>
+                </form>
+            </div>
+
+            {{if .albums}}
+            <div class="reference-section">
+                <h3>Existing Albums</h3>
+                <div class="reference-items">
+                    {{range .albums}}
+                    <div class="reference-item">
+                        <strong>{{.NameOriginal}}</strong>
+                        {{if .NameEnglish}}<em>({{.NameEnglish}})</em>{{end}}
+                        {{if .Type}}<span class="badge">{{.Type}}</span>{{end}}
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+        </main>
+    </div>
+
+    <script src="/static/js/theme-toggle.js"></script>
+    <script src="/static/js/fuzzy-search.js"></script>
+    <script>
+        // Fuzzy search functionality for categories
+        const categoriesData = JSON.parse('{{.categoriesJSON}}');
+        setupFuzzySearch(
+            'category-search',
+            'category-dropdown',
+            'selected-category',
+            'category-id',
+            categoriesData,
+            'CategoryID',
+            'Name',
+            true // single selection
+        );
+    </script>
+</body>
+</html>
+{{end}}

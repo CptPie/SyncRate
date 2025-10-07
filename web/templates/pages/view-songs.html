@@ -63,6 +63,12 @@
                 {{range $index, $songUnit := .Units}} {{if $index}}, {{end}}<span class="unit-name">{{$songUnit.NameOriginal}}</span> {{end}}
               </div>
               {{end}}
+              {{if .Albums}}
+              <div class="albums">
+                {{if eq (len .Albums) 1}}Album{{else}}Albums{{end}}:
+                {{range $index, $songAlbum := .Albums}} {{if $index}}, {{end}}<span class="album-name">{{$songAlbum.NameOriginal}}</span> {{end}}
+              </div>
+              {{end}}
               <p><strong>Source:</strong> <a href="{{.SourceURL}}" target="_blank" rel="noopener">{{.SourceURL}}</a></p>
               <p><strong>ID:</strong> {{.SongID}}</p>
               <p>
@@ -146,6 +152,15 @@
               <input type="hidden" name="unit_ids" id="edit-unit-ids">
             </div>
           </div>
+          <div class="form-group">
+            <label for="edit_albums" class="form-label">Albums (optional):</label>
+            <div class="fuzzy-search-container">
+              <input type="text" id="edit-albums-search" class="form-input fuzzy-search" placeholder="Search for albums..." autocomplete="off">
+              <div class="fuzzy-dropdown" id="edit-albums-dropdown"></div>
+              <div class="selected-items" id="edit-selected-albums"></div>
+              <input type="hidden" name="album_ids" id="edit-album-ids">
+            </div>
+          </div>
           <div class="form-actions">
             <button type="button" class="btn-secondary" onclick="closeEditModal()">Cancel</button>
             <button type="submit" class="btn-primary">Save Changes</button>
@@ -182,6 +197,7 @@
       const categoriesData = JSON.parse('{{.categoriesJSON}}');
       const artistsData = JSON.parse('{{.artistsJSON}}');
       const unitsData = JSON.parse('{{.unitsJSON}}');
+      const albumsData = JSON.parse('{{.albumsJSON}}');
       const songsData = JSON.parse('{{.songsJSON}}');
 
       let currentSong = null;
@@ -204,9 +220,11 @@
         document.getElementById("edit-selected-category").innerHTML = "";
         document.getElementById("edit-selected-artists").innerHTML = "";
         document.getElementById("edit-selected-units").innerHTML = "";
+        document.getElementById("edit-selected-albums").innerHTML = "";
         document.getElementById("edit-category-id").value = "";
         document.getElementById("edit-artist-ids").value = "";
         document.getElementById("edit-unit-ids").value = "";
+        document.getElementById("edit-album-ids").value = "";
 
         // Populate category selection
         if (currentSong.Category && currentSong.Category.CategoryID) {
@@ -241,10 +259,20 @@
           unitContainer.innerHTML = "";
         }
 
+        // Populate album selections
+        if (currentSong.Albums && currentSong.Albums.length > 0) {
+          const albumContainer = document.getElementById("edit-selected-albums");
+          const albumHiddenInput = document.getElementById("edit-album-ids");
+          const albumIds = currentSong.Albums.map((a) => a.AlbumID).join(",");
+          albumHiddenInput.value = albumIds;
+          albumContainer.innerHTML = "";
+        }
+
         // Setup fuzzy searches
         setupFuzzySearch('edit-category-search', 'edit-category-dropdown', 'edit-selected-category', 'edit-category-id', categoriesData, 'CategoryID', 'Name', true);
         setupFuzzySearch('edit-artists-search', 'edit-artists-dropdown', 'edit-selected-artists', 'edit-artist-ids', artistsData, 'ArtistID', 'NameOriginal');
         setupFuzzySearch('edit-units-search', 'edit-units-dropdown', 'edit-selected-units', 'edit-unit-ids', unitsData, 'UnitID', 'NameOriginal');
+        setupFuzzySearch('edit-albums-search', 'edit-albums-dropdown', 'edit-selected-albums', 'edit-album-ids', albumsData, 'AlbumID', 'NameOriginal');
 
         document.getElementById("editModal").style.display = "flex";
       }

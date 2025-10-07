@@ -71,6 +71,16 @@
                         </div>
                     </div>
 
+                    <div class="form-group">
+                        <label for="albums" class="form-label">Albums (optional):</label>
+                        <div class="fuzzy-search-container">
+                            <input type="text" id="albums-search" class="form-input fuzzy-search" placeholder="Search for albums..." autocomplete="off">
+                            <div class="fuzzy-dropdown" id="albums-dropdown"></div>
+                            <div class="selected-items" id="selected-albums"></div>
+                            <input type="hidden" name="album_ids" id="album-ids">
+                        </div>
+                    </div>
+
                     <button type="submit" class="btn-primary">Add Song</button>
                 </form>
             </div>
@@ -84,10 +94,12 @@
         const categoriesData = JSON.parse('{{.categoriesJSON}}');
         const artistsData = JSON.parse('{{.artistsJSON}}');
         const unitsData = JSON.parse('{{.unitsJSON}}');
+        const albumsData = JSON.parse('{{.albumsJSON}}');
 
         setupFuzzySearch('category-search', 'category-dropdown', 'selected-category', 'category-id', categoriesData, 'CategoryID', 'Name', true);
         setupFuzzySearch('artists-search', 'artists-dropdown', 'selected-artists', 'artist-ids', artistsData, 'ArtistID', 'NameOriginal');
         setupFuzzySearch('units-search', 'units-dropdown', 'selected-units', 'unit-ids', unitsData, 'UnitID', 'NameOriginal');
+        setupFuzzySearch('albums-search', 'albums-dropdown', 'selected-albums', 'album-ids', albumsData, 'AlbumID', 'NameOriginal');
     </script>
 </body>
 </html>

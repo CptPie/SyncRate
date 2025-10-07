@@ -18,10 +18,11 @@ func GetAdmin(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		log.Println("GetAdmin: Loading admin panel")
 
-		var categoryCount, unitCount, artistCount, songCount int64
+		var categoryCount, unitCount, artistCount, albumCount, songCount int64
 		db.Model(&models.Category{}).Count(&categoryCount)
 		db.Model(&models.Unit{}).Count(&unitCount)
 		db.Model(&models.Artist{}).Count(&artistCount)
+		db.Model(&models.Album{}).Count(&albumCount)
 		db.Model(&models.Song{}).Count(&songCount)
 
 		templateData := GetUserContext(c)
@@ -29,6 +30,7 @@ func GetAdmin(db *gorm.DB) gin.HandlerFunc {
 		templateData["categoryCount"] = categoryCount
 		templateData["unitCount"] = unitCount
 		templateData["artistCount"] = artistCount
+		templateData["albumCount"] = albumCount
 		templateData["songCount"] = songCount
 
 		c.HTML(http.StatusOK, "admin-index.html", templateData)
@@ -115,25 +117,53 @@ func GetAddSong(db *gorm.DB) gin.HandlerFunc {
 		var categories []models.Category
 		var artists []models.Artist
 		var units []models.Unit
+		var albums []models.Album
 		db.Find(&categories)
 		db.Find(&artists)
 		db.Find(&units)
+		db.Preload("Category").Find(&albums)
 
 		// Convert to JSON for JavaScript
 		categoriesJSON, _ := json.Marshal(categories)
 		artistsJSON, _ := json.Marshal(artists)
 		unitsJSON, _ := json.Marshal(units)
+		albumsJSON, _ := json.Marshal(albums)
 
 		templateData := GetUserContext(c)
 		templateData["title"] = "SyncRate | Add Song"
 		templateData["categories"] = categories
 		templateData["artists"] = artists
 		templateData["units"] = units
+		templateData["albums"] = albums
 		templateData["categoriesJSON"] = string(categoriesJSON)
 		templateData["artistsJSON"] = string(artistsJSON)
 		templateData["unitsJSON"] = string(unitsJSON)
+		templateData["albumsJSON"] = string(albumsJSON)
 
 		c.HTML(http.StatusOK, "add-song.html", templateData)
+	}
+}
+
+// Add Album page
+func GetAddAlbum(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log.Println("GetAddAlbum: Loading add album page")
+
+		var albums []models.Album
+		var categories []models.Category
+		db.Preload("Category").Find(&albums)
+		db.Find(&categories)
+
+		// Convert to JSON for JavaScript
+		categoriesJSON, _ := json.Marshal(categories)
+
+		templateData := GetUserContext(c)
+		templateData["title"] = "SyncRate | Add Album"
+		templateData["albums"] = albums
+		templateData["categories"] = categories
+		templateData["categoriesJSON"] = string(categoriesJSON)
+
+		c.HTML(http.StatusOK, "add-album.html", templateData)
 	}
 }
 
@@ -855,10 +885,67 @@ func PostAddSong(db *gorm.DB) gin.HandlerFunc {
 			}
 		}
 
+		// Handle album associations
+		if albumIDsStr := strings.TrimSpace(c.PostForm("album_ids")); albumIDsStr != "" {
+			albumIDs := strings.Split(albumIDsStr, ",")
+			for _, albumIDStr := range albumIDs {
+				if albumID, err := strconv.ParseUint(strings.TrimSpace(albumIDStr), 10, 32); err == nil {
+					albumSong := models.AlbumSong{
+						AlbumID: uint(albumID),
+						SongID:  song.SongID,
+					}
+					if err := tx.Create(&albumSong).Error; err != nil {
+						log.Printf("PostAddSong: Warning - failed to associate song with album %d: %v", albumID, err)
+					}
+				}
+			}
+		}
+
 		tx.Commit()
 
 		log.Printf("PostAddSong: Successfully created song '%s' with ID %d", song.NameOriginal, song.SongID)
 		c.Redirect(http.StatusSeeOther, "/admin/add-song")
+	}
+}
+
+func PostAddAlbum(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log.Println("PostAddAlbum: Adding new album")
+
+		nameOriginal := strings.TrimSpace(c.PostForm("name_original"))
+		if nameOriginal == "" {
+			c.HTML(http.StatusBadRequest, "error.html", gin.H{
+				"error": "Album name is required",
+			})
+			return
+		}
+
+		album := models.Album{
+			NameOriginal: nameOriginal,
+			NameEnglish:  strings.TrimSpace(c.PostForm("name_english")),
+			AlbumArtURL:  strings.TrimSpace(c.PostForm("album_art_url")),
+			Type:         strings.TrimSpace(c.PostForm("type")),
+		}
+
+		// Parse category ID if provided
+		if categoryIDStr := strings.TrimSpace(c.PostForm("category_id")); categoryIDStr != "" {
+			if categoryID, err := strconv.ParseUint(categoryIDStr, 10, 32); err == nil {
+				categoryIDUint := uint(categoryID)
+				album.CategoryID = &categoryIDUint
+			}
+		}
+
+		result := db.Create(&album)
+		if result.Error != nil {
+			log.Printf("PostAddAlbum: Error creating album: %v", result.Error)
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+				"error": "Failed to create album: " + result.Error.Error(),
+			})
+			return
+		}
+
+		log.Printf("PostAddAlbum: Successfully created album '%s' with ID %d", album.NameOriginal, album.AlbumID)
+		c.Redirect(http.StatusSeeOther, "/admin/add-album")
 	}
 }
 
@@ -871,17 +958,20 @@ func GetViewSongs(db *gorm.DB) gin.HandlerFunc {
 		var categories []models.Category
 		var artists []models.Artist
 		var units []models.Unit
+		var albums []models.Album
 
-		db.Preload("Category").Preload("Artists").Preload("Units").Find(&songs)
+		db.Preload("Category").Preload("Artists").Preload("Units").Preload("Albums").Find(&songs)
 		db.Find(&categories)
 		db.Preload("Category").Find(&artists)
 		db.Preload("Category").Find(&units)
+		db.Preload("Category").Find(&albums)
 
 		// Convert to JSON for JavaScript
 		songsJSON, _ := json.Marshal(songs)
 		categoriesJSON, _ := json.Marshal(categories)
 		artistsJSON, _ := json.Marshal(artists)
 		unitsJSON, _ := json.Marshal(units)
+		albumsJSON, _ := json.Marshal(albums)
 
 		templateData := GetUserContext(c)
 		templateData["title"] = "SyncRate | View Songs"
@@ -889,10 +979,12 @@ func GetViewSongs(db *gorm.DB) gin.HandlerFunc {
 		templateData["categories"] = categories
 		templateData["artists"] = artists
 		templateData["units"] = units
+		templateData["albums"] = albums
 		templateData["songsJSON"] = string(songsJSON)
 		templateData["categoriesJSON"] = string(categoriesJSON)
 		templateData["artistsJSON"] = string(artistsJSON)
 		templateData["unitsJSON"] = string(unitsJSON)
+		templateData["albumsJSON"] = string(albumsJSON)
 		templateData["isAdminPage"] = true
 
 		c.HTML(http.StatusOK, "view-songs.html", templateData)
@@ -1002,6 +1094,15 @@ func PostEditSong(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		if err := tx.Model(&song).Association("Albums").Clear(); err != nil {
+			tx.Rollback()
+			log.Printf("PostEditSong: Error clearing album associations: %v", err)
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+				"error": "Failed to update album associations: " + err.Error(),
+			})
+			return
+		}
+
 		// Add artist associations
 		if artistIDsStr := strings.TrimSpace(c.PostForm("artist_ids")); artistIDsStr != "" {
 			artistIDs := strings.Split(artistIDsStr, ",")
@@ -1038,6 +1139,27 @@ func PostEditSong(db *gorm.DB) gin.HandlerFunc {
 					log.Printf("PostEditSong: Error adding unit associations: %v", err)
 					c.HTML(http.StatusInternalServerError, "error.html", gin.H{
 						"error": "Failed to update unit associations: " + err.Error(),
+					})
+					return
+				}
+			}
+		}
+
+		// Add album associations
+		if albumIDsStr := strings.TrimSpace(c.PostForm("album_ids")); albumIDsStr != "" {
+			albumIDs := strings.Split(albumIDsStr, ",")
+			var albums []models.Album
+			for _, albumIDStr := range albumIDs {
+				if albumID, err := strconv.ParseUint(strings.TrimSpace(albumIDStr), 10, 32); err == nil {
+					albums = append(albums, models.Album{AlbumID: uint(albumID)})
+				}
+			}
+			if len(albums) > 0 {
+				if err := tx.Model(&song).Association("Albums").Append(albums); err != nil {
+					tx.Rollback()
+					log.Printf("PostEditSong: Error adding album associations: %v", err)
+					c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+						"error": "Failed to update album associations: " + err.Error(),
 					})
 					return
 				}
@@ -1128,5 +1250,161 @@ func PostDeleteSong(db *gorm.DB) gin.HandlerFunc {
 		tx.Commit()
 		log.Printf("PostDeleteSong: Successfully deleted song with ID %d", id)
 		c.Redirect(http.StatusSeeOther, "/admin/view-songs")
+	}
+}
+
+// View Albums page
+func GetViewAlbums(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log.Println("GetViewAlbums: Loading view albums page")
+
+		var albums []models.Album
+		var categories []models.Category
+		db.Preload("Category").Preload("Songs").Find(&albums)
+		db.Find(&categories)
+
+		// Convert to JSON for JavaScript
+		albumsJSON, _ := json.Marshal(albums)
+		categoriesJSON, _ := json.Marshal(categories)
+
+		templateData := GetUserContext(c)
+		templateData["title"] = "SyncRate | View Albums"
+		templateData["albums"] = albums
+		templateData["categories"] = categories
+		templateData["albumsJSON"] = string(albumsJSON)
+		templateData["categoriesJSON"] = string(categoriesJSON)
+		templateData["isAdminPage"] = true
+
+		c.HTML(http.StatusOK, "view-albums.html", templateData)
+	}
+}
+
+// Edit Album
+func PostEditAlbum(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		idParam := c.Param("id")
+		log.Printf("PostEditAlbum: Editing album ID: %s", idParam)
+
+		id, err := strconv.ParseUint(idParam, 10, 32)
+		if err != nil {
+			log.Printf("PostEditAlbum: Invalid album ID format: %v", err)
+			c.HTML(http.StatusBadRequest, "error.html", gin.H{
+				"error": "Invalid album ID: " + err.Error(),
+			})
+			return
+		}
+
+		nameOriginal := strings.TrimSpace(c.PostForm("name_original"))
+		if nameOriginal == "" {
+			c.HTML(http.StatusBadRequest, "error.html", gin.H{
+				"error": "Album name is required",
+			})
+			return
+		}
+
+		var album models.Album
+		result := db.First(&album, uint(id))
+		if result.Error != nil {
+			if result.Error == gorm.ErrRecordNotFound {
+				c.HTML(http.StatusNotFound, "error.html", gin.H{
+					"error": "Album not found",
+				})
+				return
+			}
+			log.Printf("PostEditAlbum: Database error: %v", result.Error)
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+				"error": "Failed to find album: " + result.Error.Error(),
+			})
+			return
+		}
+
+		// Update album fields
+		album.NameOriginal = nameOriginal
+		album.NameEnglish = strings.TrimSpace(c.PostForm("name_english"))
+		album.AlbumArtURL = strings.TrimSpace(c.PostForm("album_art_url"))
+		album.Type = strings.TrimSpace(c.PostForm("type"))
+
+		// Parse category ID if provided
+		album.CategoryID = nil
+		if categoryIDStr := strings.TrimSpace(c.PostForm("category_id")); categoryIDStr != "" {
+			if categoryID, err := strconv.ParseUint(categoryIDStr, 10, 32); err == nil {
+				categoryIDUint := uint(categoryID)
+				album.CategoryID = &categoryIDUint
+			}
+		}
+
+		result = db.Save(&album)
+		if result.Error != nil {
+			log.Printf("PostEditAlbum: Error updating album: %v", result.Error)
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+				"error": "Failed to update album: " + result.Error.Error(),
+			})
+			return
+		}
+
+		log.Printf("PostEditAlbum: Successfully updated album '%s' with ID %d", album.NameOriginal, album.AlbumID)
+		c.Redirect(http.StatusSeeOther, "/admin/albums")
+	}
+}
+
+// Delete Album
+func PostDeleteAlbum(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		idParam := c.Param("id")
+		log.Printf("PostDeleteAlbum: Deleting album ID: %s", idParam)
+
+		id, err := strconv.ParseUint(idParam, 10, 32)
+		if err != nil {
+			log.Printf("PostDeleteAlbum: Invalid album ID format: %v", err)
+			c.HTML(http.StatusBadRequest, "error.html", gin.H{
+				"error": "Invalid album ID: " + err.Error(),
+			})
+			return
+		}
+
+		// Start transaction to delete album and its associations
+		tx := db.Begin()
+
+		// Get album to clear associations
+		var album models.Album
+		result := tx.First(&album, uint(id))
+		if result.Error != nil {
+			tx.Rollback()
+			if result.Error == gorm.ErrRecordNotFound {
+				c.HTML(http.StatusNotFound, "error.html", gin.H{
+					"error": "Album not found",
+				})
+				return
+			}
+			log.Printf("PostDeleteAlbum: Database error: %v", result.Error)
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+				"error": "Failed to find album: " + result.Error.Error(),
+			})
+			return
+		}
+
+		// Clear song associations
+		if err := tx.Model(&album).Association("Songs").Clear(); err != nil {
+			tx.Rollback()
+			log.Printf("PostDeleteAlbum: Error clearing song associations: %v", err)
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+				"error": "Failed to delete album associations: " + err.Error(),
+			})
+			return
+		}
+
+		// Delete the album
+		if err := tx.Delete(&album).Error; err != nil {
+			tx.Rollback()
+			log.Printf("PostDeleteAlbum: Error deleting album: %v", err)
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+				"error": "Failed to delete album: " + err.Error(),
+			})
+			return
+		}
+
+		tx.Commit()
+		log.Printf("PostDeleteAlbum: Successfully deleted album with ID %d", id)
+		c.Redirect(http.StatusSeeOther, "/admin/albums")
 	}
 }

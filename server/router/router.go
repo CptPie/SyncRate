@@ -86,24 +86,29 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		admin.POST("/add-artist", handlers.PostAddArtist(db))
 		admin.GET("/add-song", handlers.GetAddSong(db))
 		admin.POST("/add-song", handlers.PostAddSong(db))
+		admin.GET("/add-album", handlers.GetAddAlbum(db))
+		admin.POST("/add-album", handlers.PostAddAlbum(db))
 
 		// View routes
 		admin.GET("/categories", handlers.GetViewCategories(db))
 		admin.GET("/units", handlers.GetViewUnits(db))
 		admin.GET("/artists", handlers.GetViewArtists(db))
 		admin.GET("/view-songs", handlers.GetViewSongs(db))
+		admin.GET("/albums", handlers.GetViewAlbums(db))
 
 		// Edit routes
 		admin.POST("/categories/:id/edit", handlers.PostEditCategory(db))
 		admin.POST("/units/:id/edit", handlers.PostEditUnit(db))
 		admin.POST("/artists/:id/edit", handlers.PostEditArtist(db))
 		admin.POST("/songs/:id/edit", handlers.PostEditSong(db))
+		admin.POST("/albums/:id/edit", handlers.PostEditAlbum(db))
 
 		// Delete routes
 		admin.POST("/categories/:id/delete", handlers.PostDeleteCategory(db))
 		admin.POST("/units/:id/delete", handlers.PostDeleteUnit(db))
 		admin.POST("/artists/:id/delete", handlers.PostDeleteArtist(db))
 		admin.POST("/songs/:id/delete", handlers.PostDeleteSong(db))
+		admin.POST("/albums/:id/delete", handlers.PostDeleteAlbum(db))
 	}
 
 	return r

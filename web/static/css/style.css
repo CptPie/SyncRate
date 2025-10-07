@@ -314,6 +314,12 @@ h2 {
   font-weight: 300;
 }
 
+.song-card .albums {
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 300;
+}
+
 .song-card .categories {
   margin-top: 8px;
   color: var(--text-secondary);
@@ -477,6 +483,7 @@ input[type="color"]:focus {
 
 .song-info .artist,
 .song-info .units,
+.song-info .albums,
 .song-info .categories {
   color: var(--text-secondary);
   font-size: 14px;

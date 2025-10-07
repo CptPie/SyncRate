@@ -45,6 +45,13 @@
             </div>
             {{end}}
 
+            {{if .song.Albums}}
+            <div class="albums">
+              {{if eq (len .song.Albums) 1}}Album{{else}}Albums{{end}}:
+              {{range $index, $songAlbum := .song.Albums}} {{if $index}}, {{end}}<span class="album-name">{{$songAlbum.NameOriginal}}</span> {{end}}
+            </div>
+            {{end}}
+
             {{if or .song.Category .song.IsCover}}
             <div class="categories">
               Tags:
