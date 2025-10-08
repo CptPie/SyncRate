@@ -71,6 +71,45 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	r.GET("/rating-room/:roomId", handlers.GetRatingRoom(db))
 	r.GET("/rating-room/:roomId/ws", handlers.GetRatingRoomWS(db))
 
+	// API routes
+	api := r.Group("/api")
+	{
+		// Songs API
+		api.GET("/songs", handlers.GetAPISongs(db))
+		api.GET("/songs/:id", handlers.GetAPISong(db))
+		api.POST("/songs", handlers.PostAPISong(db))
+
+		// Artists API
+		api.GET("/artists", handlers.GetAPIArtists(db))
+		api.GET("/artists/:id", handlers.GetAPIArtist(db))
+		api.POST("/artists", handlers.PostAPIArtist(db))
+
+		// Albums API
+		api.GET("/albums", handlers.GetAPIAlbums(db))
+		api.GET("/albums/:id", handlers.GetAPIAlbum(db))
+		api.POST("/albums", handlers.PostAPIAlbum(db))
+
+		// Units API
+		api.GET("/units", handlers.GetAPIUnits(db))
+		api.GET("/units/:id", handlers.GetAPIUnit(db))
+		api.POST("/units", handlers.PostAPIUnit(db))
+
+		// Categories API
+		api.GET("/categories", handlers.GetAPICategories(db))
+		api.GET("/categories/:id", handlers.GetAPICategory(db))
+		api.POST("/categories", handlers.PostAPICategory(db))
+
+		// Votes API
+		api.GET("/votes", handlers.GetAPIVotes(db))
+		api.GET("/votes/:id", handlers.GetAPIVote(db))
+		api.POST("/votes", handlers.PostAPIVote(db))
+
+		// Users API
+		api.GET("/users", handlers.GetAPIUsers(db))
+		api.GET("/users/:id", handlers.GetAPIUser(db))
+		api.POST("/users", handlers.PostAPIUser(db))
+	}
+
 	// Admin routes (protected)
 	admin := r.Group("/admin")
 	admin.Use(middleware.RequireAuth())
