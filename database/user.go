@@ -32,19 +32,6 @@ func (db *Database) validateUser(user *models.User, isUpdate bool) error {
 		}
 	}
 
-	// DiscordID validation and uniqueness check
-	if user.DiscordID != "" {
-		if !isUpdate {
-			exists, err := db.DiscordIDExists(user.DiscordID)
-			if err != nil {
-				return fmt.Errorf("failed to check discord ID uniqueness: %w", err)
-			}
-			if exists {
-				return errors.New("discord ID already exists")
-			}
-		}
-	}
-
 	return nil
 }
 
@@ -83,17 +70,6 @@ func (db *Database) GetUserByUsername(username string) (*models.User, error) {
 	return &user, nil
 }
 
-func (db *Database) GetUserByDiscordID(discordID string) (*models.User, error) {
-	if strings.TrimSpace(discordID) == "" {
-		return nil, errors.New("discord ID cannot be empty")
-	}
-
-	var user models.User
-	if err := db.DB.Preload("Votes").Where("discord_id = ?", discordID).First(&user).Error; err != nil {
-		return nil, fmt.Errorf("failed to get user by discord ID: %w", err)
-	}
-	return &user, nil
-}
 
 func (db *Database) GetAllUsers() ([]models.User, error) {
 	var users []models.User
@@ -135,17 +111,6 @@ func (db *Database) UpdateUser(user *models.User) error {
 		}
 		if exists {
 			return errors.New("username already exists")
-		}
-	}
-
-	// Check discord ID uniqueness only if it's being changed
-	if user.DiscordID != currentUser.DiscordID && user.DiscordID != "" {
-		exists, err := db.DiscordIDExists(user.DiscordID)
-		if err != nil {
-			return fmt.Errorf("failed to check discord ID uniqueness: %w", err)
-		}
-		if exists {
-			return errors.New("discord ID already exists")
 		}
 	}
 
@@ -204,14 +169,3 @@ func (db *Database) UsernameExists(username string) (bool, error) {
 	return count > 0, nil
 }
 
-func (db *Database) DiscordIDExists(discordID string) (bool, error) {
-	if strings.TrimSpace(discordID) == "" {
-		return false, nil
-	}
-
-	var count int64
-	if err := db.DB.Model(&models.User{}).Where("discord_id = ?", discordID).Count(&count).Error; err != nil {
-		return false, fmt.Errorf("failed to check if discord ID exists: %w", err)
-	}
-	return count > 0, nil
-}
