@@ -1472,8 +1472,35 @@ input[type="color"]:focus {
   background: var(--accent-hover);
 }
 
+.btn-secondary:disabled {
+  background: var(--border-medium);
+  color: var(--text-secondary);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .btn-danger:hover {
   background: var(--accent-danger-hover);
+}
+
+/* Pagination controls */
+.pagination-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  margin-top: 30px;
+  padding: 20px;
+}
+
+.pagination-controls button {
+  min-width: 100px;
+}
+
+#page-info {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
 }
 
 /* Modal styles */

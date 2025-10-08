@@ -26,6 +26,120 @@
 </div>
 
 <script>
+// Render function for admin view cards
+function renderAdminSongCard(song) {
+  const artists = song.Artists || [];
+  const units = song.Units || [];
+  const albums = song.Albums || [];
+
+  const artistsHTML = artists.length > 0 ? `
+    <div class="artist">
+      ${artists.length === 1 ? 'Artist' : 'Artists'}:
+      ${artists.map((a, i) => `${i > 0 ? ', ' : ''}<span class="artist-name">${a.NameOriginal}</span>`).join('')}
+    </div>
+  ` : '';
+
+  const unitsHTML = units.length > 0 ? `
+    <div class="units">
+      ${units.length === 1 ? 'Group' : 'Groups'}:
+      ${units.map((u, i) => `${i > 0 ? ', ' : ''}<span class="unit-name">${u.NameOriginal}</span>`).join('')}
+    </div>
+  ` : '';
+
+  const albumsHTML = albums.length > 0 ? `
+    <div class="albums">
+      ${albums.length === 1 ? 'Album' : 'Albums'}:
+      ${albums.map((a, i) => `${i > 0 ? ', ' : ''}<span class="album-name">${a.NameOriginal}</span>`).join('')}
+    </div>
+  ` : '';
+
+  return `
+    <div class="view-card" data-id="${song.SongID}" data-song-id="${song.SongID}">
+      <div class="view-card-header">
+        <h3>${song.NameOriginal}</h3>
+        <div class="view-card-actions">
+          <button class="btn-secondary edit-btn" onclick="openEditModal(${song.SongID})">Edit</button>
+          <button class="btn-danger delete-btn" onclick="deleteSong(${song.SongID}, '${song.NameOriginal.replace(/'/g, "\\'")}')">Delete</button>
+        </div>
+      </div>
+      <div class="view-card-details">
+        ${song.NameEnglish ? `<p><strong>English Name:</strong> ${song.NameEnglish}</p>` : ''}
+        ${song.ThumbnailURL ? `<div class="song-thumbnail"><img src="${song.ThumbnailURL}" alt="${song.NameOriginal}" class="song-card-image"></div>` : ''}
+        ${song.Category ? `<p><strong>Category:</strong> ${song.Category.Name}</p>` : ''}
+        ${song.IsCover ? '<p><strong>Type:</strong> Cover Version</p>' : ''}
+        ${artistsHTML}
+        ${unitsHTML}
+        ${albumsHTML}
+        <p><strong>Source:</strong> <a href="${song.SourceURL}" target="_blank" rel="noopener">${song.SourceURL}</a></p>
+        <p><strong>ID:</strong> ${song.SongID}</p>
+        <p><strong>Created:</strong> ${new Date(song.CreatedAt).toLocaleString('en-CA', {year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false}).replace(',', '')}</p>
+        ${song.CreatedAt !== song.UpdatedAt ? `<p><strong>Updated:</strong> ${new Date(song.UpdatedAt).toLocaleString('en-CA', {year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false}).replace(',', '')}</p>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+// Render function for regular song cards
+function renderSongCard(song) {
+  const artists = song.Artists || [];
+  const units = song.Units || [];
+  const albums = song.Albums || [];
+
+  const artistsHTML = artists.length > 0 ? `
+    <div class="artist">
+      ${artists.length === 1 ? 'Artist' : 'Artists'}:
+      ${artists.map((a, i) => `${i > 0 ? ', ' : ''}<span class="artist-name">${a.NameOriginal}</span>`).join('')}
+    </div>
+  ` : '';
+
+  const unitsHTML = units.length > 0 ? `
+    <div class="units">
+      ${units.length === 1 ? 'Group' : 'Groups'}:
+      ${units.map((u, i) => `${i > 0 ? ', ' : ''}<span class="unit-name">${u.NameOriginal}</span>`).join('')}
+    </div>
+  ` : '';
+
+  const albumsHTML = albums.length > 0 ? `
+    <div class="albums">
+      ${albums.length === 1 ? 'Album' : 'Albums'}:
+      ${albums.map((a, i) => `${i > 0 ? ', ' : ''}<span class="album-name">${a.NameOriginal}</span>`).join('')}
+    </div>
+  ` : '';
+
+  const scoreHTML = (song.vote_count && song.vote_count > 0) ? `
+    <div class="song-average-score">
+      <span class="score-value">${song.average_score.toFixed(1)}</span>
+      <span class="score-separator">/</span>
+      <span class="score-max">10</span>
+    </div>
+  ` : '';
+
+  const categoryHTML = (song.Category || song.IsCover) ? `
+    <div class="categories">
+      Tags:
+      ${song.Category ? `<span class="category">${song.Category.Name}</span>` : ''}
+      ${song.IsCover ? '<span class="category" style="background: #28a745">Cover</span>' : ''}
+    </div>
+  ` : '';
+
+  return `
+    <a href="/songs/${song.SongID}" style="text-decoration: none; color: inherit">
+      <div class="song-card" data-id="${song.SongID}" data-song-id="${song.SongID}">
+        <div class="song-card-header">
+          ${song.ThumbnailURL ? `<img src="${song.ThumbnailURL}" alt="${song.NameOriginal}" class="song-card-image" />` : ''}
+          ${scoreHTML}
+        </div>
+        <h3>${song.NameOriginal}</h3>
+        ${song.NameEnglish ? `<p><em>${song.NameEnglish}</em></p>` : ''}
+        ${artistsHTML}
+        ${unitsHTML}
+        ${albumsHTML}
+        ${categoryHTML}
+      </div>
+    </a>
+  `;
+}
+
 // Search Filter Initialization for Songs
 function initializeSongsSearch() {
   // Check if dependencies are loaded
@@ -36,29 +150,14 @@ function initializeSongsSearch() {
 
   const songsData = JSON.parse('{{.songsJSON}}');
   const categoriesData = JSON.parse('{{.categoriesJSON}}');
+  const isAdminPage = {{if .isAdminPage}}true{{else}}false{{end}};
 
-  const searchFilter = new FuzzySearchFilter({
-    searchInputId: 'song-search',
-    categoryFilterId: 'category-filter',
-    coversFilterId: 'covers-filter',
-    itemsContainerId: 'songs-container',
-    itemClass: '{{if .isAdminPage}}view-card{{else}}song-card{{end}}',
-    noResultsId: 'no-results',
-    data: songsData,
-    categoriesData: categoriesData,
-    searchFields: [
-      'NameOriginal',
-      'NameEnglish',
-      'SourceURL',
-      'Artists',
-      'Units'
-    ],
-    fuzzyThreshold: 15
-  });
-
-  // Update search stats
+  // Update search stats function - declared early so it can be used in onRenderComplete
+  let searchFilter; // Forward declare so it can be referenced inside updateSearchStats
   function updateSearchStats() {
     const stats = document.getElementById('search-stats');
+    if (!stats || !searchFilter) return;
+
     const totalCount = songsData.length;
     const filteredCount = searchFilter.filteredData.length;
 
@@ -69,17 +168,37 @@ function initializeSongsSearch() {
     }
   }
 
-  // Override the renderItems method to also update stats and apply colors
-  const originalRenderItems = searchFilter.renderItems.bind(searchFilter);
-  searchFilter.renderItems = function() {
-    originalRenderItems();
-    updateSearchStats();
-    // Apply colors after rendering
-    initializeAllColors(this.filteredData);
-  };
+  searchFilter = new FuzzySearchFilter({
+    searchInputId: 'song-search',
+    categoryFilterId: 'category-filter',
+    coversFilterId: 'covers-filter',
+    itemsContainerId: 'songs-container',
+    itemClass: isAdminPage ? 'view-card' : 'song-card',
+    noResultsId: 'no-results',
+    data: songsData,
+    categoriesData: categoriesData,
+    searchFields: [
+      'NameOriginal',
+      'NameEnglish',
+      'SourceURL',
+      'Artists',
+      'Units',
+      'Albums'
+    ],
+    renderFunction: isAdminPage ? renderAdminSongCard : renderSongCard,
+    itemsPerPage: 50,
+    fuzzyThreshold: 15,
+    onRenderComplete: function(pageData) {
+      // Re-initialize artist colors for the rendered songs (only for non-admin pages)
+      if (!isAdminPage && typeof initializeAllColors === 'function') {
+        initializeAllColors(pageData);
+      }
+      // Update search stats after rendering
+      updateSearchStats();
+    }
+  });
 
-  // Initialize colors and stats on page load
-  initializeAllColors(songsData);
+  // Initial stats update
   updateSearchStats();
 
   // Make searchFilter available globally if needed

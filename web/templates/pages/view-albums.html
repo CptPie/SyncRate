@@ -41,43 +41,13 @@
 
         {{if .albums}}
         <div class="view-grid" id="albums-container">
-          {{range .albums}}
-          <div class="view-card" data-id="{{.AlbumID}}">
-            <div class="view-card-header">
-              <h3>{{.NameOriginal}}</h3>
-              <div class="view-card-actions">
-                <button
-                  class="btn-secondary edit-btn"
-                  onclick="openEditModal({{.AlbumID}})"
-                >
-                  Edit
-                </button>
-                <button
-                  class="btn-danger delete-btn"
-                  onclick="deleteAlbum({{.AlbumID}}, '{{.NameOriginal}}')"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-            <div class="view-card-details">
-              {{if .NameEnglish}}<p><strong>English Name:</strong> {{.NameEnglish}}</p>{{end}}
-              {{if .AlbumArtURL}}
-              <div class="song-thumbnail">
-                <img src="{{.AlbumArtURL}}" alt="{{.NameOriginal}}" class="song-card-image">
-              </div>
-              {{end}}
-              {{if .Type}}<p><strong>Type:</strong> <span class="badge">{{.Type}}</span></p>{{end}}
-              {{if .Category}}<p><strong>Category:</strong> {{.Category.Name}}</p>{{end}}
-              {{if .Songs}}<p><strong>Songs:</strong> {{len .Songs}}</p>{{end}}
-              <p><strong>ID:</strong> {{.AlbumID}}</p>
-              <p><strong>Created:</strong> {{.CreatedAt.Format "2006-01-02 15:04"}}</p>
-              {{if ne .CreatedAt .UpdatedAt}}
-              <p><strong>Updated:</strong> {{.UpdatedAt.Format "2006-01-02 15:04"}}</p>
-              {{end}}
-            </div>
-          </div>
-          {{end}}
+          <!-- Albums will be rendered by JavaScript -->
+        </div>
+
+        <div class="pagination-controls">
+          <button id="prev-page" class="btn-secondary">Previous</button>
+          <span id="page-info"></span>
+          <button id="next-page" class="btn-secondary">Next</button>
         </div>
         {{else}}
         <div class="empty-state">
@@ -157,6 +127,36 @@
     <script src="/static/js/theme-toggle.js"></script>
     <script src="/static/js/search-filter.js"></script>
     <script>
+      const albumsData = JSON.parse("{{.albumsJSON}}");
+      const categoriesData = JSON.parse("{{.categoriesJSON}}");
+
+      // Render function for album cards
+      function renderAlbumCard(album) {
+        const songsCount = album.Songs ? album.Songs.length : 0;
+
+        return `
+          <div class="view-card" data-id="${album.AlbumID}">
+            <div class="view-card-header">
+              <h3>${album.NameOriginal}</h3>
+              <div class="view-card-actions">
+                <button class="btn-secondary edit-btn" onclick="openEditModal(${album.AlbumID})">Edit</button>
+                <button class="btn-danger delete-btn" onclick="deleteAlbum(${album.AlbumID}, '${album.NameOriginal.replace(/'/g, "\\'")}')">Delete</button>
+              </div>
+            </div>
+            <div class="view-card-details">
+              ${album.NameEnglish ? `<p><strong>English Name:</strong> ${album.NameEnglish}</p>` : ''}
+              ${album.AlbumArtURL ? `<div class="song-thumbnail"><img src="${album.AlbumArtURL}" alt="${album.NameOriginal}" class="song-card-image"></div>` : ''}
+              ${album.Type ? `<p><strong>Type:</strong> <span class="badge">${album.Type}</span></p>` : ''}
+              ${album.Category ? `<p><strong>Category:</strong> ${album.Category.Name}</p>` : ''}
+              ${songsCount > 0 ? `<p><strong>Songs:</strong> ${songsCount}</p>` : ''}
+              <p><strong>ID:</strong> ${album.AlbumID}</p>
+              <p><strong>Created:</strong> ${new Date(album.CreatedAt).toLocaleString('en-CA', {year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false}).replace(',', '')}</p>
+              ${album.CreatedAt !== album.UpdatedAt ? `<p><strong>Updated:</strong> ${new Date(album.UpdatedAt).toLocaleString('en-CA', {year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false}).replace(',', '')}</p>` : ''}
+            </div>
+          </div>
+        `;
+      }
+
       function openEditModal(albumId) {
         // Find the album in the data
         const currentAlbum = albumsData.find(album => album.AlbumID === albumId);
@@ -200,10 +200,24 @@
         }
       }
 
+      // Update search stats function
+      let searchFilter;
+      function updateSearchStats() {
+        const stats = document.getElementById('search-stats');
+        if (!stats || !searchFilter) return;
+
+        const totalCount = albumsData.length;
+        const filteredCount = searchFilter.filteredData.length;
+
+        if (filteredCount === totalCount) {
+          stats.textContent = `${totalCount} albums total`;
+        } else {
+          stats.textContent = `${filteredCount} of ${totalCount} albums`;
+        }
+      }
+
       // Initialize search and filter functionality
-      const albumsData = JSON.parse("{{.albumsJSON}}");
-      const categoriesData = JSON.parse("{{.categoriesJSON}}");
-      const searchFilter = new FuzzySearchFilter({
+      searchFilter = new FuzzySearchFilter({
         searchInputId: 'album-search',
         categoryFilterId: 'category-filter',
         itemsContainerId: 'albums-container',
@@ -216,28 +230,16 @@
           'NameEnglish',
           'Type'
         ],
-        fuzzyThreshold: 15
+        renderFunction: renderAlbumCard,
+        itemsPerPage: 50,
+        fuzzyThreshold: 15,
+        onRenderComplete: function(pageData) {
+          updateSearchStats();
+        }
       });
 
-      // Update search stats
-      function updateSearchStats() {
-        const stats = document.getElementById('search-stats');
-        const totalCount = albumsData.length;
-        const filteredCount = searchFilter.filteredData.length;
-
-        if (filteredCount === totalCount) {
-          stats.textContent = `${totalCount} albums total`;
-        } else {
-          stats.textContent = `${filteredCount} of ${totalCount} albums`;
-        }
-      }
-
-      // Override the renderItems method to also update stats
-      const originalRenderItems = searchFilter.renderItems.bind(searchFilter);
-      searchFilter.renderItems = function() {
-        originalRenderItems();
-        updateSearchStats();
-      };
+      // Initial stats update
+      updateSearchStats();
     </script>
   </body>
 </html>

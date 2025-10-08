@@ -17,73 +17,13 @@
 
         {{if .songs}}
         <div class="view-grid" id="songs-container">
-          {{range .songs}}
-          <div class="view-card" data-id="{{.SongID}}" data-song-id="{{.SongID}}">
-            <div class="view-card-header">
-              <h3>{{.NameOriginal}}</h3>
-              <div class="view-card-actions">
-                <button
-                  class="btn-secondary edit-btn"
-                  onclick="openEditModal({{.SongID}})"
-                >
-                  Edit
-                </button>
-                <button
-                  class="btn-danger delete-btn"
-                  onclick="deleteSong({{.SongID}}, '{{.NameOriginal}}')"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-            <div class="view-card-details">
-              {{if .NameEnglish}}
-              <p><strong>English Name:</strong> {{.NameEnglish}}</p>
-              {{end}}
-              {{if .ThumbnailURL}}
-              <div class="song-thumbnail">
-                <img src="{{.ThumbnailURL}}" alt="{{.NameOriginal}}" class="song-card-image">
-              </div>
-              {{end}}
-              {{if .Category}}
-              <p><strong>Category:</strong> {{.Category.Name}}</p>
-              {{end}}
-              {{if .IsCover}}
-              <p><strong>Type:</strong> Cover Version</p>
-              {{end}}
-              {{if .Artists}}
-              <div class="artist">
-                {{if eq (len .Artists) 1}}Artist{{else}}Artists{{end}}:
-                {{range $index, $songArtist := .Artists}} {{if $index}}, {{end}}<span class="artist-name">{{$songArtist.NameOriginal}}</span> {{end}}
-              </div>
-              {{end}}
-              {{if .Units}}
-              <div class="units">
-                {{if eq (len .Units) 1}}Group{{else}}Groups{{end}}:
-                {{range $index, $songUnit := .Units}} {{if $index}}, {{end}}<span class="unit-name">{{$songUnit.NameOriginal}}</span> {{end}}
-              </div>
-              {{end}}
-              {{if .Albums}}
-              <div class="albums">
-                {{if eq (len .Albums) 1}}Album{{else}}Albums{{end}}:
-                {{range $index, $songAlbum := .Albums}} {{if $index}}, {{end}}<span class="album-name">{{$songAlbum.NameOriginal}}</span> {{end}}
-              </div>
-              {{end}}
-              <p><strong>Source:</strong> <a href="{{.SourceURL}}" target="_blank" rel="noopener">{{.SourceURL}}</a></p>
-              <p><strong>ID:</strong> {{.SongID}}</p>
-              <p>
-                <strong>Created:</strong>
-                {{.CreatedAt.Format "2006-01-02 15:04"}}
-              </p>
-              {{if ne .CreatedAt .UpdatedAt}}
-              <p>
-                <strong>Updated:</strong>
-                {{.UpdatedAt.Format "2006-01-02 15:04"}}
-              </p>
-              {{end}}
-            </div>
-          </div>
-          {{end}}
+          <!-- Songs will be rendered by JavaScript -->
+        </div>
+
+        <div class="pagination-controls">
+          <button id="prev-page" class="btn-secondary">Previous</button>
+          <span id="page-info"></span>
+          <button id="next-page" class="btn-secondary">Next</button>
         </div>
         {{else}}
         <div class="empty-state">

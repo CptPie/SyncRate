@@ -10,6 +10,13 @@ class SearchFilter {
         this.searchFields = options.searchFields || []; // Array of field paths to search in
         this.data = options.data || [];
         this.categoriesData = options.categoriesData || [];
+        this.renderFunction = options.renderFunction || null; // Custom render function
+        this.onRenderComplete = options.onRenderComplete || null; // Callback after rendering
+
+        // Pagination
+        this.itemsPerPage = options.itemsPerPage || 50;
+        this.currentPage = 1;
+        this.totalPages = 1;
 
         this.filteredData = [...this.data];
         this.currentSearchTerm = '';
@@ -22,17 +29,20 @@ class SearchFilter {
     init() {
         this.setupEventListeners();
         this.populateCategoryFilter();
-        this.renderItems();
+        this.filterAndRender(); // Use filterAndRender to ensure pagination is set up
     }
 
     setupEventListeners() {
         const searchInput = document.getElementById(this.searchInputId);
         const categoryFilter = document.getElementById(this.categoryFilterId);
         const coversFilter = document.getElementById(this.coversFilterId);
+        const prevButton = document.getElementById('prev-page');
+        const nextButton = document.getElementById('next-page');
 
         if (searchInput) {
             searchInput.addEventListener('input', (e) => {
                 this.currentSearchTerm = e.target.value.toLowerCase().trim();
+                this.currentPage = 1; // Reset to first page on new search
                 this.filterAndRender();
             });
         }
@@ -40,6 +50,7 @@ class SearchFilter {
         if (categoryFilter) {
             categoryFilter.addEventListener('change', (e) => {
                 this.currentCategoryFilter = e.target.value;
+                this.currentPage = 1; // Reset to first page on filter change
                 this.filterAndRender();
             });
         }
@@ -47,8 +58,17 @@ class SearchFilter {
         if (coversFilter) {
             coversFilter.addEventListener('change', (e) => {
                 this.currentCoversFilter = e.target.checked;
+                this.currentPage = 1; // Reset to first page on filter change
                 this.filterAndRender();
             });
+        }
+
+        if (prevButton) {
+            prevButton.addEventListener('click', () => this.previousPage());
+        }
+
+        if (nextButton) {
+            nextButton.addEventListener('click', () => this.nextPage());
         }
     }
 
@@ -73,7 +93,66 @@ class SearchFilter {
             return this.matchesSearch(item) && this.matchesCategory(item) && this.matchesCovers(item);
         });
 
+        // Calculate total pages (minimum 1 if there are results)
+        this.totalPages = this.filteredData.length > 0
+            ? Math.ceil(this.filteredData.length / this.itemsPerPage)
+            : 1;
+
+        // Ensure current page is valid
+        if (this.currentPage > this.totalPages) {
+            this.currentPage = 1;
+        }
+        if (this.currentPage < 1) {
+            this.currentPage = 1;
+        }
+
         this.renderItems();
+        this.updatePaginationControls();
+    }
+
+    previousPage() {
+        if (this.currentPage > 1) {
+            this.currentPage--;
+            this.renderItems();
+            this.updatePaginationControls();
+            this.scrollToTop();
+        }
+    }
+
+    nextPage() {
+        if (this.currentPage < this.totalPages) {
+            this.currentPage++;
+            this.renderItems();
+            this.updatePaginationControls();
+            this.scrollToTop();
+        }
+    }
+
+    scrollToTop() {
+        const container = document.getElementById(this.itemsContainerId);
+        if (container) {
+            container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+
+    updatePaginationControls() {
+        const prevButton = document.getElementById('prev-page');
+        const nextButton = document.getElementById('next-page');
+        const pageInfo = document.getElementById('page-info');
+
+        if (prevButton) {
+            prevButton.disabled = this.currentPage <= 1;
+        }
+
+        if (nextButton) {
+            nextButton.disabled = this.currentPage >= this.totalPages;
+        }
+
+        if (pageInfo) {
+            const start = (this.currentPage - 1) * this.itemsPerPage + 1;
+            const end = Math.min(this.currentPage * this.itemsPerPage, this.filteredData.length);
+            pageInfo.textContent = `Page ${this.currentPage} of ${this.totalPages} (${start}-${end} of ${this.filteredData.length} items)`;
+        }
     }
 
     matchesSearch(item) {
@@ -126,12 +205,47 @@ class SearchFilter {
         const container = document.getElementById(this.itemsContainerId);
         const noResults = document.getElementById(this.noResultsId);
 
-        if (!container) return;
+        if (!container) {
+            console.error('Container not found!');
+            return;
+        }
 
-        // Hide all existing items - target the outermost container for each item
+        // If a custom render function is provided, use it
+        if (this.renderFunction) {
+            const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+            const endIndex = Math.min(startIndex + this.itemsPerPage, this.filteredData.length);
+            const pageData = this.filteredData.slice(startIndex, endIndex);
+
+            container.innerHTML = '';
+
+            if (this.filteredData.length === 0) {
+                if (noResults) {
+                    noResults.style.display = 'block';
+                }
+                return;
+            }
+
+            if (noResults) {
+                noResults.style.display = 'none';
+            }
+
+            pageData.forEach((item) => {
+                const itemHTML = this.renderFunction(item);
+                if (itemHTML) {
+                    container.insertAdjacentHTML('beforeend', itemHTML);
+                }
+            });
+
+            // Call post-render callback if provided
+            if (this.onRenderComplete && typeof this.onRenderComplete === 'function') {
+                this.onRenderComplete(pageData);
+            }
+            return;
+        }
+
+        // Fallback: hide/show existing items (old behavior)
         const allItems = container.querySelectorAll('.' + this.itemClass);
         allItems.forEach(item => {
-            // Find the outermost wrapper (could be an <a> tag or the item itself)
             const wrapper = item.closest('a') || item;
             wrapper.style.display = 'none';
         });
@@ -147,12 +261,16 @@ class SearchFilter {
             noResults.style.display = 'none';
         }
 
-        // Show matching items
-        this.filteredData.forEach(dataItem => {
+        // Calculate pagination range
+        const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+        const endIndex = Math.min(startIndex + this.itemsPerPage, this.filteredData.length);
+        const pageData = this.filteredData.slice(startIndex, endIndex);
+
+        // Show matching items for current page only
+        pageData.forEach(dataItem => {
             const itemId = this.getItemId(dataItem);
             const itemElement = container.querySelector(`[data-id="${itemId}"]`);
             if (itemElement) {
-                // Find the outermost wrapper (could be an <a> tag or the item itself)
                 const wrapper = itemElement.closest('a') || itemElement;
                 wrapper.style.display = '';
             }
