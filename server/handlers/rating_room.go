@@ -326,15 +326,16 @@ func sendRoomState(db *gorm.DB, roomID string, conn *websocket.Conn) {
 
 			// Send song change message
 			songData := wsocket.SongChangeData{
-				SongID:       song.SongID,
-				SongTitle:    song.NameOriginal,
-				EmbedURL:     embedURL,
-				ThumbnailURL: song.ThumbnailURL,
-				Artists:      artists,
-				Units:        units,
-				Albums:       albums,
-				Category:     categoryName,
-				IsCover:      song.IsCover,
+				SongID:            song.SongID,
+				SongTitleOriginal: song.NameOriginal,
+				SongTitleEnglish:  song.NameEnglish,
+				EmbedURL:          embedURL,
+				ThumbnailURL:      song.ThumbnailURL,
+				Artists:           artists,
+				Units:             units,
+				Albums:            albums,
+				Category:          categoryName,
+				IsCover:           song.IsCover,
 			}
 
 			data, _ := json.Marshal(songData)
@@ -581,15 +582,16 @@ func broadcastSongChange(db *gorm.DB, roomID string, song models.Song) {
 
 	// Create song change message
 	songData := wsocket.SongChangeData{
-		SongID:       song.SongID,
-		SongTitle:    song.NameOriginal,
-		EmbedURL:     embedURL,
-		ThumbnailURL: song.ThumbnailURL,
-		Artists:      artists,
-		Units:        units,
-		Albums:       albums,
-		Category:     categoryName,
-		IsCover:      song.IsCover,
+		SongID:            song.SongID,
+		SongTitleOriginal: song.NameOriginal,
+		SongTitleEnglish:  song.NameEnglish,
+		EmbedURL:          embedURL,
+		ThumbnailURL:      song.ThumbnailURL,
+		Artists:           artists,
+		Units:             units,
+		Albums:            albums,
+		Category:          categoryName,
+		IsCover:           song.IsCover,
 	}
 
 	data, _ := json.Marshal(songData)

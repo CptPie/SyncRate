@@ -212,7 +212,13 @@
                 // Update song info and data-song-id for color initialization
                 const songInfo = document.getElementById('song-info');
                 songInfo.setAttribute('data-song-id', data.song_id);
-                document.getElementById('song-title').textContent = data.song_title;
+                // Display song title with both names if different
+                const titleElement = document.getElementById('song-title');
+                if (data.song_title_english && data.song_title_english !== data.song_title_original) {
+                    titleElement.textContent = `${data.song_title_original} (${data.song_title_english})`;
+                } else {
+                    titleElement.textContent = data.song_title_original;
+                }
 
                 // Update artists with styled elements
                 const artistsContainer = document.getElementById('song-artists-container');
@@ -268,7 +274,12 @@
                         }
                         const albumSpan = document.createElement('span');
                         albumSpan.className = 'album-name';
-                        albumSpan.textContent = album.NameEnglish || album.NameOriginal;
+                        // Display both names if they differ
+                        if (album.NameEnglish && album.NameEnglish !== album.NameOriginal) {
+                            albumSpan.textContent = `${album.NameOriginal} (${album.NameEnglish})`;
+                        } else {
+                            albumSpan.textContent = album.NameOriginal;
+                        }
                         albumsContainer.appendChild(albumSpan);
                     });
                 }

@@ -89,15 +89,16 @@ type AlbumData struct {
 }
 
 type SongChangeData struct {
-	SongID       uint         `json:"song_id"`
-	SongTitle    string       `json:"song_title"`
-	EmbedURL     string       `json:"embed_url"`
-	ThumbnailURL string       `json:"thumbnail_url"`
-	Artists      []ArtistData `json:"artists"`
-	Units        []UnitData   `json:"units"`
-	Albums       []AlbumData  `json:"albums"`
-	Category     string       `json:"category"`
-	IsCover      bool         `json:"is_cover"`
+	SongID           uint         `json:"song_id"`
+	SongTitleOriginal string      `json:"song_title_original"`
+	SongTitleEnglish  string      `json:"song_title_english"`
+	EmbedURL         string       `json:"embed_url"`
+	ThumbnailURL     string       `json:"thumbnail_url"`
+	Artists          []ArtistData `json:"artists"`
+	Units            []UnitData   `json:"units"`
+	Albums           []AlbumData  `json:"albums"`
+	Category         string       `json:"category"`
+	IsCover          bool         `json:"is_cover"`
 }
 
 type VideoSyncData struct {
