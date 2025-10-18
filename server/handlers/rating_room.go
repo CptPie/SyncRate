@@ -43,6 +43,36 @@ func init() {
 	}()
 }
 
+// StartDatabaseCleanup starts a background routine to clean up old rating rooms from the database
+func StartDatabaseCleanup(db *gorm.DB) {
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				cleanupOldRatingRooms(db, 24*time.Hour)
+			}
+		}
+	}()
+}
+
+// cleanupOldRatingRooms removes rating rooms that haven't been active for the specified duration
+func cleanupOldRatingRooms(db *gorm.DB, inactivityThreshold time.Duration) {
+	cutoffTime := time.Now().Add(-inactivityThreshold)
+
+	result := db.Where("last_active < ?", cutoffTime).Delete(&models.RatingRoom{})
+	if result.Error != nil {
+		log.Printf("Error cleaning up old rating rooms: %v", result.Error)
+		return
+	}
+
+	if result.RowsAffected > 0 {
+		log.Printf("Cleaned up %d inactive rating rooms from database (older than %v)", result.RowsAffected, inactivityThreshold)
+	}
+}
+
 // GetCreateRatingRoom shows the room creation page
 func GetCreateRatingRoom(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -206,6 +236,15 @@ func GetRatingRoomWS(db *gorm.DB) gin.HandlerFunc {
 
 // handleRoomConnection manages the WebSocket connection for a room
 func handleRoomConnection(db *gorm.DB, roomID, userID string, conn *websocket.Conn) {
+	// Check if room exists in database
+	if err := checkRoomExists(db, roomID); err != nil {
+		conn.WriteJSON(map[string]interface{}{
+			"type":  "error",
+			"error": "This rating room no longer exists",
+		})
+		return
+	}
+
 	// Send initial room state
 	sendRoomState(db, roomID, conn)
 
@@ -217,7 +256,7 @@ func handleRoomConnection(db *gorm.DB, roomID, userID string, conn *websocket.Co
 			break
 		}
 
-		handleRoomMessage(db, roomID, userID, msg)
+		handleRoomMessage(db, roomID, userID, msg, conn)
 	}
 }
 
@@ -299,7 +338,20 @@ func sendRoomState(db *gorm.DB, roomID string, conn *websocket.Conn) {
 }
 
 // handleRoomMessage processes incoming WebSocket messages
-func handleRoomMessage(db *gorm.DB, roomID, userID string, msg wsocket.WSMessage) {
+func handleRoomMessage(db *gorm.DB, roomID, userID string, msg wsocket.WSMessage, conn *websocket.Conn) {
+	// Check if room still exists in database
+	if err := checkRoomExists(db, roomID); err != nil {
+		log.Printf("Room %s no longer exists: %v", roomID, err)
+		conn.WriteJSON(map[string]interface{}{
+			"type":  "error",
+			"error": "This rating room no longer exists. The page will reload.",
+		})
+		return
+	}
+
+	// Update last_active timestamp for any room activity
+	updateRoomActivity(db, roomID)
+
 	switch msg.Type {
 	case wsocket.MsgVideoSync:
 		// Broadcast video sync to all room members
@@ -527,6 +579,25 @@ func broadcastSongChange(db *gorm.DB, roomID string, song models.Song) {
 }
 
 // Helper functions
+
+// updateRoomActivity updates the last_active timestamp for a room
+func updateRoomActivity(db *gorm.DB, roomID string) {
+	db.Model(&models.RatingRoom{}).
+		Where("room_id = ?", roomID).
+		Update("last_active", time.Now())
+}
+
+// checkRoomExists checks if a room exists in the database and returns an error if not
+func checkRoomExists(db *gorm.DB, roomID string) error {
+	var room models.RatingRoom
+	if err := db.Where("room_id = ?", roomID).First(&room).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return fmt.Errorf("room not found")
+		}
+		return fmt.Errorf("database error: %v", err)
+	}
+	return nil
+}
 
 // generateRoomCode creates a unique 6-character room code
 func generateRoomCode() string {

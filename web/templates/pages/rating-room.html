@@ -186,7 +186,18 @@
                         break;
                     case 'error':
                         console.error('Room error:', message.error);
+                        this.handleError(message.error);
                         break;
+                }
+            }
+
+            handleError(errorMessage) {
+                // Show error to user
+                alert(errorMessage);
+
+                // If the room no longer exists, redirect to home
+                if (errorMessage.includes('no longer exists')) {
+                    window.location.href = '/';
                 }
             }
 

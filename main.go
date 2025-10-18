@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/CptPie/SyncRate/database"
+	"github.com/CptPie/SyncRate/server/handlers"
 	"github.com/CptPie/SyncRate/server/router"
 )
 
@@ -29,6 +30,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
+
+	// Start background cleanup for old rating rooms
+	handlers.StartDatabaseCleanup(db.DB)
+	log.Println("Started database cleanup routine for rating rooms")
 
 	// Start web server
 	r := router.SetupRouter(db.DB)
