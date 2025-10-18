@@ -1106,13 +1106,23 @@ func PostEditSong(db *gorm.DB) gin.HandlerFunc {
 		// Add artist associations
 		if artistIDsStr := strings.TrimSpace(c.PostForm("artist_ids")); artistIDsStr != "" {
 			artistIDs := strings.Split(artistIDsStr, ",")
-			var artists []models.Artist
+			var artistIDsParsed []uint
 			for _, artistIDStr := range artistIDs {
 				if artistID, err := strconv.ParseUint(strings.TrimSpace(artistIDStr), 10, 32); err == nil {
-					artists = append(artists, models.Artist{ArtistID: uint(artistID)})
+					artistIDsParsed = append(artistIDsParsed, uint(artistID))
 				}
 			}
-			if len(artists) > 0 {
+			if len(artistIDsParsed) > 0 {
+				// Fetch the actual artist records from database
+				var artists []models.Artist
+				if err := tx.Where("artist_id IN ?", artistIDsParsed).Find(&artists).Error; err != nil {
+					tx.Rollback()
+					log.Printf("PostEditSong: Error fetching artists: %v", err)
+					c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+						"error": "Failed to fetch artists: " + err.Error(),
+					})
+					return
+				}
 				if err := tx.Model(&song).Association("Artists").Append(artists); err != nil {
 					tx.Rollback()
 					log.Printf("PostEditSong: Error adding artist associations: %v", err)
@@ -1127,13 +1137,23 @@ func PostEditSong(db *gorm.DB) gin.HandlerFunc {
 		// Add unit associations
 		if unitIDsStr := strings.TrimSpace(c.PostForm("unit_ids")); unitIDsStr != "" {
 			unitIDs := strings.Split(unitIDsStr, ",")
-			var units []models.Unit
+			var unitIDsParsed []uint
 			for _, unitIDStr := range unitIDs {
 				if unitID, err := strconv.ParseUint(strings.TrimSpace(unitIDStr), 10, 32); err == nil {
-					units = append(units, models.Unit{UnitID: uint(unitID)})
+					unitIDsParsed = append(unitIDsParsed, uint(unitID))
 				}
 			}
-			if len(units) > 0 {
+			if len(unitIDsParsed) > 0 {
+				// Fetch the actual unit records from database
+				var units []models.Unit
+				if err := tx.Where("unit_id IN ?", unitIDsParsed).Find(&units).Error; err != nil {
+					tx.Rollback()
+					log.Printf("PostEditSong: Error fetching units: %v", err)
+					c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+						"error": "Failed to fetch units: " + err.Error(),
+					})
+					return
+				}
 				if err := tx.Model(&song).Association("Units").Append(units); err != nil {
 					tx.Rollback()
 					log.Printf("PostEditSong: Error adding unit associations: %v", err)
@@ -1148,13 +1168,23 @@ func PostEditSong(db *gorm.DB) gin.HandlerFunc {
 		// Add album associations
 		if albumIDsStr := strings.TrimSpace(c.PostForm("album_ids")); albumIDsStr != "" {
 			albumIDs := strings.Split(albumIDsStr, ",")
-			var albums []models.Album
+			var albumIDsParsed []uint
 			for _, albumIDStr := range albumIDs {
 				if albumID, err := strconv.ParseUint(strings.TrimSpace(albumIDStr), 10, 32); err == nil {
-					albums = append(albums, models.Album{AlbumID: uint(albumID)})
+					albumIDsParsed = append(albumIDsParsed, uint(albumID))
 				}
 			}
-			if len(albums) > 0 {
+			if len(albumIDsParsed) > 0 {
+				// Fetch the actual album records from database
+				var albums []models.Album
+				if err := tx.Where("album_id IN ?", albumIDsParsed).Find(&albums).Error; err != nil {
+					tx.Rollback()
+					log.Printf("PostEditSong: Error fetching albums: %v", err)
+					c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+						"error": "Failed to fetch albums: " + err.Error(),
+					})
+					return
+				}
 				if err := tx.Model(&song).Association("Albums").Append(albums); err != nil {
 					tx.Rollback()
 					log.Printf("PostEditSong: Error adding album associations: %v", err)
