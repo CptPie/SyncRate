@@ -244,12 +244,46 @@ func sendRoomState(db *gorm.DB, roomID string, conn *websocket.Conn) {
 				}
 			}
 
+			// Build artists array with color information
+			artists := make([]wsocket.ArtistData, 0, len(song.Artists))
+			for _, artist := range song.Artists {
+				artists = append(artists, wsocket.ArtistData{
+					ArtistID:       artist.ArtistID,
+					NameOriginal:   artist.NameOriginal,
+					NameEnglish:    artist.NameEnglish,
+					PrimaryColor:   artist.PrimaryColor,
+					SecondaryColor: artist.SecondaryColor,
+				})
+			}
+
+			// Build units array with color information
+			units := make([]wsocket.UnitData, 0, len(song.Units))
+			for _, unit := range song.Units {
+				units = append(units, wsocket.UnitData{
+					UnitID:         unit.UnitID,
+					NameOriginal:   unit.NameOriginal,
+					NameEnglish:    unit.NameEnglish,
+					PrimaryColor:   unit.PrimaryColor,
+					SecondaryColor: unit.SecondaryColor,
+				})
+			}
+
+			// Get category name
+			categoryName := ""
+			if song.Category != nil {
+				categoryName = song.Category.Name
+			}
+
 			// Send song change message
 			songData := wsocket.SongChangeData{
 				SongID:       song.SongID,
 				SongTitle:    song.NameOriginal,
 				EmbedURL:     embedURL,
 				ThumbnailURL: song.ThumbnailURL,
+				Artists:      artists,
+				Units:        units,
+				Category:     categoryName,
+				IsCover:      song.IsCover,
 			}
 
 			data, _ := json.Marshal(songData)
@@ -440,12 +474,46 @@ func broadcastSongChange(db *gorm.DB, roomID string, song models.Song) {
 		}
 	}
 
+	// Build artists array with color information
+	artists := make([]wsocket.ArtistData, 0, len(song.Artists))
+	for _, artist := range song.Artists {
+		artists = append(artists, wsocket.ArtistData{
+			ArtistID:       artist.ArtistID,
+			NameOriginal:   artist.NameOriginal,
+			NameEnglish:    artist.NameEnglish,
+			PrimaryColor:   artist.PrimaryColor,
+			SecondaryColor: artist.SecondaryColor,
+		})
+	}
+
+	// Build units array with color information
+	units := make([]wsocket.UnitData, 0, len(song.Units))
+	for _, unit := range song.Units {
+		units = append(units, wsocket.UnitData{
+			UnitID:         unit.UnitID,
+			NameOriginal:   unit.NameOriginal,
+			NameEnglish:    unit.NameEnglish,
+			PrimaryColor:   unit.PrimaryColor,
+			SecondaryColor: unit.SecondaryColor,
+		})
+	}
+
+	// Get category name
+	categoryName := ""
+	if song.Category != nil {
+		categoryName = song.Category.Name
+	}
+
 	// Create song change message
 	songData := wsocket.SongChangeData{
 		SongID:       song.SongID,
 		SongTitle:    song.NameOriginal,
 		EmbedURL:     embedURL,
 		ThumbnailURL: song.ThumbnailURL,
+		Artists:      artists,
+		Units:        units,
+		Category:     categoryName,
+		IsCover:      song.IsCover,
 	}
 
 	data, _ := json.Marshal(songData)

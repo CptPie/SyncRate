@@ -65,11 +65,31 @@ type JoinRoomData struct {
 	Username string `json:"username"`
 }
 
+type ArtistData struct {
+	ArtistID       uint   `json:"ArtistID"`
+	NameOriginal   string `json:"NameOriginal"`
+	NameEnglish    string `json:"NameEnglish"`
+	PrimaryColor   string `json:"PrimaryColor"`
+	SecondaryColor string `json:"SecondaryColor"`
+}
+
+type UnitData struct {
+	UnitID         uint   `json:"UnitID"`
+	NameOriginal   string `json:"NameOriginal"`
+	NameEnglish    string `json:"NameEnglish"`
+	PrimaryColor   string `json:"PrimaryColor"`
+	SecondaryColor string `json:"SecondaryColor"`
+}
+
 type SongChangeData struct {
-	SongID      uint   `json:"song_id"`
-	SongTitle   string `json:"song_title"`
-	EmbedURL    string `json:"embed_url"`
-	ThumbnailURL string `json:"thumbnail_url"`
+	SongID       uint         `json:"song_id"`
+	SongTitle    string       `json:"song_title"`
+	EmbedURL     string       `json:"embed_url"`
+	ThumbnailURL string       `json:"thumbnail_url"`
+	Artists      []ArtistData `json:"artists"`
+	Units        []UnitData   `json:"units"`
+	Category     string       `json:"category"`
+	IsCover      bool         `json:"is_cover"`
 }
 
 type VideoSyncData struct {

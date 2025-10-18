@@ -26,12 +26,18 @@
                             </div>
                         </div>
 
-                        <div id="song-info" class="song-info" style="display: none;">
+                        <div id="song-info" class="song-info" style="display: none;" data-song-id="">
                             <h3 id="song-title">Song Title</h3>
                             <div class="song-details">
-                                <span id="song-artists">Artists</span>
-                                <span class="separator">•</span>
-                                <span id="song-category">Category</span>
+                                <div id="song-artists-container">
+                                    <span id="song-artists">Artists</span>
+                                </div>
+                                <div id="song-units-container">
+                                    <span id="song-units">Units</span>
+                                </div>
+                                <div id="song-tags-container">
+                                    <span id="song-category">Category</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -102,6 +108,7 @@
     </div>
 
     <script src="/static/js/theme-toggle.js"></script>
+    <script src="/static/js/artist-colors.js"></script>
     <script>
         class RatingRoom {
             constructor(roomId) {
@@ -188,9 +195,89 @@
                 this.hasVoted = false;
                 this.userVotes.clear();
 
-                // Update song info
+                // Update song info and data-song-id for color initialization
+                const songInfo = document.getElementById('song-info');
+                songInfo.setAttribute('data-song-id', data.song_id);
                 document.getElementById('song-title').textContent = data.song_title;
-                document.getElementById('song-info').style.display = 'block';
+
+                // Update artists with styled elements
+                const artistsContainer = document.getElementById('song-artists-container');
+                artistsContainer.innerHTML = '';
+                if (data.artists && data.artists.length > 0) {
+                    const label = document.createElement('span');
+                    label.textContent = (data.artists.length === 1 ? 'Artist: ' : 'Artists: ');
+                    artistsContainer.appendChild(label);
+
+                    data.artists.forEach((artist, index) => {
+                        if (index > 0) {
+                            artistsContainer.appendChild(document.createTextNode(', '));
+                        }
+                        const artistSpan = document.createElement('span');
+                        artistSpan.className = 'artist-name';
+                        artistSpan.textContent = artist.NameEnglish || artist.NameOriginal;
+                        artistsContainer.appendChild(artistSpan);
+                    });
+                } else {
+                    artistsContainer.textContent = 'Unknown Artist';
+                }
+
+                // Update units with styled elements (if any)
+                const unitsContainer = document.getElementById('song-units-container');
+                unitsContainer.innerHTML = '';
+                if (data.units && data.units.length > 0) {
+                    const unitLabel = document.createElement('span');
+                    unitLabel.textContent = (data.units.length === 1 ? 'Group: ' : 'Groups: ');
+                    unitsContainer.appendChild(unitLabel);
+
+                    data.units.forEach((unit, index) => {
+                        if (index > 0) {
+                            unitsContainer.appendChild(document.createTextNode(', '));
+                        }
+                        const unitSpan = document.createElement('span');
+                        unitSpan.className = 'unit-name';
+                        unitSpan.textContent = unit.NameEnglish || unit.NameOriginal;
+                        unitsContainer.appendChild(unitSpan);
+                    });
+                }
+
+                // Update category and tags
+                const tagsContainer = document.getElementById('song-tags-container');
+                tagsContainer.innerHTML = '';
+                if (data.category || data.is_cover) {
+                    const label = document.createElement('span');
+                    label.textContent = 'Tags: ';
+                    tagsContainer.appendChild(label);
+
+                    if (data.category) {
+                        const categorySpan = document.createElement('span');
+                        categorySpan.className = 'category';
+                        categorySpan.textContent = data.category;
+                        tagsContainer.appendChild(categorySpan);
+                    }
+
+                    if (data.is_cover) {
+                        if (data.category) {
+                            tagsContainer.appendChild(document.createTextNode(' '));
+                        }
+                        const coverSpan = document.createElement('span');
+                        coverSpan.className = 'category';
+                        coverSpan.style.background = '#28a745';
+                        coverSpan.textContent = 'Cover';
+                        tagsContainer.appendChild(coverSpan);
+                    }
+                } else {
+                    tagsContainer.textContent = 'No Tags';
+                }
+
+                songInfo.style.display = 'block';
+
+                // Initialize colors for the new song data
+                const songData = [{
+                    SongID: data.song_id,
+                    Artists: data.artists,
+                    Units: data.units
+                }];
+                initializeAllColors(songData);
 
                 // Update video
                 if (data.embed_url) {

@@ -998,6 +998,14 @@ input[type="color"]:focus {
   font-size: 16px;
 }
 
+#song-units-container {
+  margin-top: 0.5em;
+}
+
+#song-tags-container {
+  margin-top: 0.5em;
+}
+
 .separator {
   margin: 0 8px;
   color: var(--text-tertiary);
