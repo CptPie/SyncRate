@@ -357,6 +357,7 @@ func findNextUnratedSong(db *gorm.DB, roomID string) *models.Song {
 				Group("song_id").
 				Having("COUNT(DISTINCT user_id) = ?", len(userIDs)),
 		).
+		Order("RANDOM()").
 		First(&song).Error
 
 	if err != nil {
@@ -369,6 +370,7 @@ func findNextUnratedSong(db *gorm.DB, roomID string) *models.Song {
 					Group("song_id").
 					Having("COUNT(*) >= ?", len(userIDs)),
 			).
+			Order("RANDOM()").
 			First(&song).Error
 
 		if err != nil {
