@@ -35,6 +35,9 @@
                                 <div id="song-units-container">
                                     <span id="song-units">Units</span>
                                 </div>
+                                <div id="song-albums-container">
+                                    <span id="song-albums">Albums</span>
+                                </div>
                                 <div id="song-tags-container">
                                     <span id="song-category">Category</span>
                                 </div>
@@ -248,6 +251,25 @@
                         unitSpan.className = 'unit-name';
                         unitSpan.textContent = unit.NameEnglish || unit.NameOriginal;
                         unitsContainer.appendChild(unitSpan);
+                    });
+                }
+
+                // Update albums with styled elements (if any)
+                const albumsContainer = document.getElementById('song-albums-container');
+                albumsContainer.innerHTML = '';
+                if (data.albums && data.albums.length > 0) {
+                    const albumLabel = document.createElement('span');
+                    albumLabel.textContent = (data.albums.length === 1 ? 'Album: ' : 'Albums: ');
+                    albumsContainer.appendChild(albumLabel);
+
+                    data.albums.forEach((album, index) => {
+                        if (index > 0) {
+                            albumsContainer.appendChild(document.createTextNode(', '));
+                        }
+                        const albumSpan = document.createElement('span');
+                        albumSpan.className = 'album-name';
+                        albumSpan.textContent = album.NameEnglish || album.NameOriginal;
+                        albumsContainer.appendChild(albumSpan);
                     });
                 }
 

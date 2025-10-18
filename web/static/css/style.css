@@ -1002,6 +1002,10 @@ input[type="color"]:focus {
   margin-top: 0.5em;
 }
 
+#song-albums-container {
+  margin-top: 0.5em;
+}
+
 #song-tags-container {
   margin-top: 0.5em;
 }

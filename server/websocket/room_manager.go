@@ -81,6 +81,13 @@ type UnitData struct {
 	SecondaryColor string `json:"SecondaryColor"`
 }
 
+type AlbumData struct {
+	AlbumID      uint   `json:"AlbumID"`
+	NameOriginal string `json:"NameOriginal"`
+	NameEnglish  string `json:"NameEnglish"`
+	Type         string `json:"Type"`
+}
+
 type SongChangeData struct {
 	SongID       uint         `json:"song_id"`
 	SongTitle    string       `json:"song_title"`
@@ -88,6 +95,7 @@ type SongChangeData struct {
 	ThumbnailURL string       `json:"thumbnail_url"`
 	Artists      []ArtistData `json:"artists"`
 	Units        []UnitData   `json:"units"`
+	Albums       []AlbumData  `json:"albums"`
 	Category     string       `json:"category"`
 	IsCover      bool         `json:"is_cover"`
 }

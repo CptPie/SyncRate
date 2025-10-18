@@ -272,7 +272,7 @@ func sendRoomState(db *gorm.DB, roomID string, conn *websocket.Conn) {
 	if room.CurrentSong != nil {
 		// Load song with related data
 		var song models.Song
-		if err := db.Preload("Artists").Preload("Units").Preload("Category").
+		if err := db.Preload("Artists").Preload("Units").Preload("Albums").Preload("Category").
 			First(&song, room.CurrentSong.SongID).Error; err == nil {
 
 			// Get embed URL using existing utility function
@@ -307,6 +307,17 @@ func sendRoomState(db *gorm.DB, roomID string, conn *websocket.Conn) {
 				})
 			}
 
+			// Build albums array
+			albums := make([]wsocket.AlbumData, 0, len(song.Albums))
+			for _, album := range song.Albums {
+				albums = append(albums, wsocket.AlbumData{
+					AlbumID:      album.AlbumID,
+					NameOriginal: album.NameOriginal,
+					NameEnglish:  album.NameEnglish,
+					Type:         album.Type,
+				})
+			}
+
 			// Get category name
 			categoryName := ""
 			if song.Category != nil {
@@ -321,6 +332,7 @@ func sendRoomState(db *gorm.DB, roomID string, conn *websocket.Conn) {
 				ThumbnailURL: song.ThumbnailURL,
 				Artists:      artists,
 				Units:        units,
+				Albums:       albums,
 				Category:     categoryName,
 				IsCover:      song.IsCover,
 			}
@@ -459,7 +471,7 @@ func findNextUnratedSong(db *gorm.DB, roomID string) *models.Song {
 	}
 
 	// Build base query with filters
-	baseQuery := db.Preload("Artists").Preload("Units").Preload("Category")
+	baseQuery := db.Preload("Artists").Preload("Units").Preload("Albums").Preload("Category")
 
 	// Apply category filter if set
 	if dbRoom.CategoryID != nil {
@@ -550,6 +562,17 @@ func broadcastSongChange(db *gorm.DB, roomID string, song models.Song) {
 		})
 	}
 
+	// Build albums array
+	albums := make([]wsocket.AlbumData, 0, len(song.Albums))
+	for _, album := range song.Albums {
+		albums = append(albums, wsocket.AlbumData{
+			AlbumID:      album.AlbumID,
+			NameOriginal: album.NameOriginal,
+			NameEnglish:  album.NameEnglish,
+			Type:         album.Type,
+		})
+	}
+
 	// Get category name
 	categoryName := ""
 	if song.Category != nil {
@@ -564,6 +587,7 @@ func broadcastSongChange(db *gorm.DB, roomID string, song models.Song) {
 		ThumbnailURL: song.ThumbnailURL,
 		Artists:      artists,
 		Units:        units,
+		Albums:       albums,
 		Category:     categoryName,
 		IsCover:      song.IsCover,
 	}
