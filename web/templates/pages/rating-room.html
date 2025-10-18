@@ -112,6 +112,7 @@
 
     <script src="/static/js/theme-toggle.js"></script>
     <script src="/static/js/artist-colors.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
     <script>
         class RatingRoom {
             constructor(roomId) {
@@ -120,6 +121,10 @@
                 this.currentSongId = null;
                 this.userVotes = new Map();
                 this.hasVoted = false;
+                this.player = null;
+                this.isSyncing = false; // Prevent sync loops
+                this.syncInterval = null;
+                this.userInteracted = false; // Track if user has interacted with player
 
                 this.initWebSocket();
                 this.initEventListeners();
@@ -332,13 +337,19 @@
                         noVideoElement.style.display = 'none';
                     }
 
-                    videoContainer.innerHTML = `
-                        <iframe id="video-player"
-                                src="${data.embed_url}"
-                                frameborder="0"
-                                allowfullscreen>
-                        </iframe>
-                    `;
+                    // Extract YouTube video ID from embed URL
+                    const videoId = this.extractYouTubeId(data.embed_url);
+
+                    // Clear old player if exists
+                    if (this.player) {
+                        this.player.destroy();
+                    }
+
+                    // Create container for new player
+                    videoContainer.innerHTML = '<div id="video-player"></div>';
+
+                    // Initialize YouTube player
+                    this.initYouTubePlayer(videoId);
                 }
 
                 // Show voting section
@@ -351,9 +362,100 @@
             }
 
             handleVideoSync(data) {
-                // Handle video synchronization if needed
-                // Could sync video time and play state
-                console.log('Video sync:', data);
+                if (!this.player || this.isSyncing) return;
+
+                this.isSyncing = true;
+
+                const currentTime = this.player.getCurrentTime();
+                const timeDiff = Math.abs(currentTime - data.time);
+
+                // Only sync if difference is significant (more than 2 seconds)
+                if (timeDiff > 2) {
+                    this.player.seekTo(data.time, true);
+                }
+
+                // Sync play state
+                const playerState = this.player.getPlayerState();
+                if (data.is_playing && playerState !== YT.PlayerState.PLAYING) {
+                    this.player.playVideo();
+                    this.userInteracted = true;
+                } else if (!data.is_playing && playerState === YT.PlayerState.PLAYING) {
+                    this.player.pauseVideo();
+                }
+
+                setTimeout(() => {
+                    this.isSyncing = false;
+                }, 200);
+            }
+
+            initYouTubePlayer(videoId) {
+                // Wait for YouTube API to be ready
+                if (typeof YT === 'undefined' || !YT.Player) {
+                    setTimeout(() => this.initYouTubePlayer(videoId), 100);
+                    return;
+                }
+
+                this.player = new YT.Player('video-player', {
+                    videoId: videoId,
+                    playerVars: {
+                        autoplay: 0, // Don't autoplay to avoid browser blocking
+                        controls: 1,
+                        modestbranding: 1,
+                        rel: 0
+                    },
+                    events: {
+                        onReady: (event) => {
+                            this.setupPlayerListeners();
+                            // Mark that user can now interact
+                            this.userInteracted = true;
+                        },
+                        onStateChange: (event) => {
+                            this.onPlayerStateChange(event);
+                        }
+                    }
+                });
+            }
+
+            setupPlayerListeners() {
+                // Broadcast state changes periodically
+                if (this.syncInterval) {
+                    clearInterval(this.syncInterval);
+                }
+
+                this.syncInterval = setInterval(() => {
+                    if (this.player && !this.isSyncing) {
+                        const state = this.player.getPlayerState();
+                        const time = this.player.getCurrentTime();
+
+                        this.sendMessage('video_sync', {
+                            time: time,
+                            is_playing: state === YT.PlayerState.PLAYING
+                        });
+                    }
+                }, 3000); // Sync every 3 seconds
+            }
+
+            onPlayerStateChange(event) {
+                // Don't broadcast if we're currently syncing from another user
+                if (this.isSyncing) return;
+
+                const time = this.player.getCurrentTime();
+                const isPlaying = event.data === YT.PlayerState.PLAYING || event.data === YT.PlayerState.BUFFERING;
+
+                // Only broadcast on actual play/pause state changes
+                if (event.data === YT.PlayerState.PLAYING || event.data === YT.PlayerState.PAUSED) {
+                    this.sendMessage('video_sync', {
+                        time: time,
+                        is_playing: event.data === YT.PlayerState.PLAYING
+                    });
+                }
+            }
+
+            extractYouTubeId(url) {
+                // Extract video ID from YouTube embed URL
+                // Format: https://www.youtube.com/embed/VIDEO_ID
+                const match = url.match(/embed\/([^?]+)/);
+                return match ? match[1] : null;
             }
 
             handleVoteUpdate(data) {
