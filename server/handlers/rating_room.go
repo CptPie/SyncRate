@@ -52,8 +52,13 @@ func GetCreateRatingRoom(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Load categories for filter options
+		var categories []models.Category
+		db.Find(&categories)
+
 		templateData := GetUserContext(c)
 		templateData["title"] = "SyncRate | Create Rating Room"
+		templateData["categories"] = categories
 
 		c.HTML(http.StatusOK, "create-rating-room.html", templateData)
 	}
@@ -69,6 +74,17 @@ func PostCreateRatingRoom(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Parse request body for filters
+		var requestBody struct {
+			CategoryID *uint `json:"category_id"`
+			CoversOnly bool  `json:"covers_only"`
+		}
+
+		// Bind JSON, but don't fail if body is empty (filters are optional)
+		if err := c.ShouldBindJSON(&requestBody); err != nil && err.Error() != "EOF" {
+			log.Printf("Error parsing request body: %v", err)
+		}
+
 		// Generate unique room code
 		roomID := generateRoomCode()
 
@@ -76,6 +92,8 @@ func PostCreateRatingRoom(db *gorm.DB) gin.HandlerFunc {
 		room := models.RatingRoom{
 			RoomID:     roomID,
 			CreatorID:  userID.(uint),
+			CategoryID: requestBody.CategoryID,
+			CoversOnly: requestBody.CoversOnly,
 			CreatedAt:  time.Now(),
 			LastActive: time.Now(),
 		}
@@ -347,9 +365,29 @@ func findNextUnratedSong(db *gorm.DB, roomID string) *models.Song {
 		return nil
 	}
 
+	// Load room filters from database
+	var dbRoom models.RatingRoom
+	if err := db.Where("room_id = ?", roomID).First(&dbRoom).Error; err != nil {
+		log.Printf("Error loading room filters: %v", err)
+		return nil
+	}
+
+	// Build base query with filters
+	baseQuery := db.Preload("Artists").Preload("Units").Preload("Category")
+
+	// Apply category filter if set
+	if dbRoom.CategoryID != nil {
+		baseQuery = baseQuery.Where("category_id = ?", *dbRoom.CategoryID)
+	}
+
+	// Apply covers filter if set
+	if dbRoom.CoversOnly {
+		baseQuery = baseQuery.Where("is_cover = ?", true)
+	}
+
 	// Find songs that haven't been rated by at least one user in the room
 	var song models.Song
-	err := db.Preload("Artists").Preload("Units").Preload("Category").
+	err := baseQuery.
 		Where("song_id NOT IN (?)",
 			db.Table("votes").
 				Select("DISTINCT song_id").
@@ -362,7 +400,7 @@ func findNextUnratedSong(db *gorm.DB, roomID string) *models.Song {
 
 	if err != nil {
 		// If no completely unrated songs, find songs rated by fewer than all users
-		err = db.Preload("Artists").Preload("Units").Preload("Category").
+		err = baseQuery.
 			Where("song_id NOT IN (?)",
 				db.Table("votes").
 					Select("song_id").
