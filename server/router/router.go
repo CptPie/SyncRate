@@ -71,6 +71,12 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	r.GET("/rating-room/:roomId", handlers.GetRatingRoom(db))
 	r.GET("/rating-room/:roomId/ws", handlers.GetRatingRoomWS(db))
 
+	// Radio room routes
+	r.GET("/create-radio-room", handlers.GetCreateRadioRoom(db))
+	r.POST("/create-radio-room", handlers.PostCreateRadioRoom(db))
+	r.GET("/radio-room/:roomId", handlers.GetRadioRoom(db))
+	r.GET("/radio-room/:roomId/ws", handlers.GetRadioRoomWS(db))
+
 	// API routes
 	api := r.Group("/api")
 	{

@@ -1,0 +1,198 @@
+{{define "create-radio-room.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {{template "head" .}}
+</head>
+<body>
+    <div class="container">
+        {{template "header" .}}
+        <main>
+            <div class="form-container">
+                <h2>Create Radio Room</h2>
+                <p>Create a radio room where you and your friends can listen to music together in real-time!</p>
+
+                <div class="room-info">
+                    <h3>How it works:</h3>
+                    <ul>
+                        <li>🎵 Listen to songs together with friends</li>
+                        <li>🔄 Synced video playback for everyone</li>
+                        <li>🎲 Songs play automatically one after another</li>
+                        <li>🎯 Filter by category and rating to customize your experience</li>
+                        <li>🔗 Share the room code with others to join</li>
+                    </ul>
+                </div>
+
+                <div class="filter-section">
+                    <h3>Room Settings</h3>
+                    <p class="filter-description">Customize which songs will play in your radio room</p>
+
+                    <div class="form-group">
+                        <label for="category-filter">Category:</label>
+                        <select id="category-filter" class="filter-select">
+                            <option value="">All Categories</option>
+                            {{range .categories}}
+                            <option value="{{.CategoryID}}">{{.Name}}</option>
+                            {{end}}
+                        </select>
+                        <p class="checkbox-description">Only play songs from a specific category</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="enable-rating-filter">
+                            <span>Enable Rating Filter</span>
+                        </label>
+                        <p class="checkbox-description">Filter songs by minimum rating</p>
+                    </div>
+
+                    <div class="form-group" id="min-rating-group" style="display: none;">
+                        <label for="min-rating">Minimum Rating:</label>
+                        <select id="min-rating" class="filter-select">
+                            <option value="1">1 - Terrible</option>
+                            <option value="2">2 - Poor</option>
+                            <option value="3">3 - Below Average</option>
+                            <option value="4">4 - Fair</option>
+                            <option value="5">5 - Average</option>
+                            <option value="6" selected>6 - Above Average</option>
+                            <option value="7">7 - Good</option>
+                            <option value="8">8 - Very Good</option>
+                            <option value="9">9 - Excellent</option>
+                            <option value="10">10 - Perfect</option>
+                        </select>
+                        <p class="checkbox-description">Only play songs with this rating or higher</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="include-covers">
+                            <span>Include Cover Songs</span>
+                        </label>
+                        <p class="checkbox-description">Include cover songs in the playlist</p>
+                    </div>
+                </div>
+
+                <button id="create-room-btn" class="btn-primary">
+                    Create Radio Room
+                </button>
+
+                <div id="room-result" class="room-result" style="display: none;">
+                    <h3>Room Created!</h3>
+                    <div class="room-details">
+                        <div class="room-code-section">
+                            <label>Room Code:</label>
+                            <div class="room-code" id="room-code"></div>
+                            <button id="copy-code-btn" class="btn-secondary">Copy Code</button>
+                        </div>
+                        <div class="room-url-section">
+                            <label>Share URL:</label>
+                            <div class="room-url" id="room-url"></div>
+                            <button id="copy-url-btn" class="btn-secondary">Copy URL</button>
+                        </div>
+                        <a id="join-room-link" class="btn-primary">Join Room</a>
+                    </div>
+                </div>
+
+                <div id="error-message" class="error-message" style="display: none;"></div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/theme-toggle.js"></script>
+    <script>
+        // Toggle rating filter visibility
+        document.getElementById('enable-rating-filter').addEventListener('change', function() {
+            const minRatingGroup = document.getElementById('min-rating-group');
+            minRatingGroup.style.display = this.checked ? 'block' : 'none';
+        });
+
+        document.getElementById('create-room-btn').addEventListener('click', async function() {
+            const btn = this;
+            btn.disabled = true;
+            btn.textContent = 'Creating...';
+
+            // Get filter values
+            const categoryId = document.getElementById('category-filter').value;
+            const enableRatingFilter = document.getElementById('enable-rating-filter').checked;
+            const minRating = document.getElementById('min-rating').value;
+            const includeCovers = document.getElementById('include-covers').checked;
+
+            // Build request body
+            const requestBody = {};
+            if (categoryId) {
+                requestBody.category_id = parseInt(categoryId);
+            }
+            if (enableRatingFilter) {
+                requestBody.min_rating = parseInt(minRating);
+            }
+            if (includeCovers) {
+                requestBody.include_covers = true;
+            }
+
+            try {
+                const response = await fetch('/create-radio-room', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Show success result
+                    document.getElementById('room-code').textContent = data.room_id;
+                    document.getElementById('room-url').textContent = window.location.origin + data.url;
+                    document.getElementById('join-room-link').href = data.url;
+                    document.getElementById('room-result').style.display = 'block';
+                    document.getElementById('error-message').style.display = 'none';
+                } else {
+                    // Show error
+                    document.getElementById('error-message').textContent = data.error || 'Failed to create room';
+                    document.getElementById('error-message').style.display = 'block';
+                    document.getElementById('room-result').style.display = 'none';
+                }
+            } catch (error) {
+                document.getElementById('error-message').textContent = 'Network error occurred';
+                document.getElementById('error-message').style.display = 'block';
+                document.getElementById('room-result').style.display = 'none';
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Create Radio Room';
+        });
+
+        // Copy functionality
+        function copyRoomCode() {
+            const roomCode = document.getElementById('room-code').textContent;
+            navigator.clipboard.writeText(roomCode).then(() => {
+                const btn = document.getElementById('copy-code-btn');
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.textContent = 'Copy Code';
+                }, 2000);
+            });
+        }
+
+        function copyRoomUrl() {
+            const roomUrl = document.getElementById('room-url').textContent;
+            navigator.clipboard.writeText(roomUrl).then(() => {
+                const btn = document.getElementById('copy-url-btn');
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.textContent = 'Copy URL';
+                }, 2000);
+            });
+        }
+
+        document.getElementById('copy-code-btn').addEventListener('click', copyRoomCode);
+        document.getElementById('copy-url-btn').addEventListener('click', copyRoomUrl);
+
+        // Enable copying by clicking on the text fields
+        document.getElementById('room-code').addEventListener('click', copyRoomCode);
+        document.getElementById('room-url').addEventListener('click', copyRoomUrl);
+    </script>
+</body>
+</html>
+{{end}}

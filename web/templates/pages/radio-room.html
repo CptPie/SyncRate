@@ -1,0 +1,526 @@
+{{define "radio-room.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {{template "head" .}}
+</head>
+<body>
+    <div class="container">
+        {{template "header" .}}
+        <main>
+            <div class="rating-room">
+                <div class="room-header">
+                    <h2>Radio Room: {{.room_id}}</h2>
+                    <div class="room-controls">
+                        <button id="next-song-btn" class="btn-primary">Next Song</button>
+                        <button id="leave-room-btn" class="btn-secondary">Leave Room</button>
+                    </div>
+                </div>
+
+                <div class="room-content">
+                    <!-- Left side: Video and Song Info -->
+                    <div class="video-section">
+                        <div id="video-container" class="video-container">
+                            <div id="no-video" class="no-video">
+                                <p>🎵 Waiting for first song...</p>
+                            </div>
+                        </div>
+
+                        <div id="song-info" class="song-info" style="display: none;" data-song-id="">
+                            <h3 id="song-title">Song Title</h3>
+                            <div class="song-details">
+                                <div id="song-artists-container">
+                                    <span id="song-artists">Artists</span>
+                                </div>
+                                <div id="song-units-container">
+                                    <span id="song-units">Units</span>
+                                </div>
+                                <div id="song-albums-container">
+                                    <span id="song-albums">Albums</span>
+                                </div>
+                                <div id="song-tags-container">
+                                    <span id="song-category">Category</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right side: Users list and votes -->
+                    <div class="sidebar">
+                        <!-- Users Section -->
+                        <div class="users-section">
+                            <h4>Listeners</h4>
+                            <div id="users-list" class="users-list">
+                                <!-- Users will be populated via WebSocket -->
+                            </div>
+                        </div>
+
+                        <!-- Votes Section -->
+                        <div id="votes-section" class="votes-section">
+                            <h4>Votes for This Song</h4>
+                            <div id="votes-list" class="votes-list">
+                                <p class="no-votes">No votes yet for this song</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/theme-toggle.js"></script>
+    <script src="/static/js/artist-colors.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script>
+        class RadioRoom {
+            constructor(roomId) {
+                this.roomId = roomId;
+                this.ws = null;
+                this.currentSongId = null;
+                this.player = null;
+                this.isSyncing = false;
+                this.syncInterval = null;
+                this.videoSyncEnabled = true;
+                this.currentUsers = [];
+                this.userVotes = new Map(); // Store votes for current song
+
+                this.initWebSocket();
+                this.initEventListeners();
+            }
+
+            initWebSocket() {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/radio-room/${this.roomId}/ws`;
+
+                this.ws = new WebSocket(wsUrl);
+
+                this.ws.onopen = () => {
+                    console.log('Connected to radio room');
+                };
+
+                this.ws.onmessage = (event) => {
+                    const message = JSON.parse(event.data);
+                    this.handleMessage(message);
+                };
+
+                this.ws.onclose = () => {
+                    console.log('Disconnected from radio room');
+                };
+
+                this.ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                };
+            }
+
+            initEventListeners() {
+                // Next song button
+                document.getElementById('next-song-btn').addEventListener('click', () => {
+                    this.sendMessage('next_song', {});
+                });
+
+                // Leave room button
+                document.getElementById('leave-room-btn').addEventListener('click', () => {
+                    window.location.href = '/';
+                });
+            }
+
+            handleMessage(message) {
+                switch (message.type) {
+                    case 'room_settings':
+                        this.handleRoomSettings(message.data);
+                        break;
+                    case 'song_change':
+                        this.handleSongChange(message.data);
+                        break;
+                    case 'video_sync':
+                        this.handleVideoSync(message.data);
+                        break;
+                    case 'vote_update':
+                        this.handleVoteUpdate(message.data);
+                        break;
+                    case 'user_update':
+                        this.handleUserUpdate(message.data);
+                        break;
+                    case 'error':
+                        console.error('Room error:', message.error);
+                        this.handleError(message.error);
+                        break;
+                }
+            }
+
+            handleRoomSettings(data) {
+                this.videoSyncEnabled = data.video_sync_enabled;
+                console.log('Video sync enabled:', this.videoSyncEnabled);
+            }
+
+            handleError(errorMessage) {
+                alert(errorMessage);
+                if (errorMessage.includes('no longer exists')) {
+                    window.location.href = '/';
+                }
+            }
+
+            handleSongChange(data) {
+                console.log('Song change data:', data);
+
+                this.currentSongId = data.song_id;
+                this.userVotes.clear(); // Clear votes for new song
+
+                // Load existing votes if any
+                if (data.existing_votes && data.existing_votes.length > 0) {
+                    console.log('Loading', data.existing_votes.length, 'existing votes');
+                    data.existing_votes.forEach(vote => {
+                        this.userVotes.set(vote.user_id, {
+                            username: vote.username,
+                            rating: vote.rating,
+                            comment: vote.comment
+                        });
+                    });
+                    this.updateVotesList();
+                    this.updateUserVotingStatus();
+                } else {
+                    this.updateVotesList(); // Show "no votes" message
+                    this.updateUserVotingStatus();
+                }
+
+                // Update song info and data-song-id for color initialization
+                const songInfo = document.getElementById('song-info');
+                songInfo.setAttribute('data-song-id', data.song_id);
+
+                // Display song title with both names if different
+                const titleElement = document.getElementById('song-title');
+                if (data.song_title_english && data.song_title_english !== data.song_title_original) {
+                    titleElement.textContent = `${data.song_title_original} (${data.song_title_english})`;
+                } else {
+                    titleElement.textContent = data.song_title_original;
+                }
+
+                // Update artists with styled elements
+                const artistsContainer = document.getElementById('song-artists-container');
+                artistsContainer.innerHTML = '';
+                if (data.artists && data.artists.length > 0) {
+                    const label = document.createElement('span');
+                    label.textContent = (data.artists.length === 1 ? 'Artist: ' : 'Artists: ');
+                    artistsContainer.appendChild(label);
+
+                    data.artists.forEach((artist, index) => {
+                        if (index > 0) {
+                            artistsContainer.appendChild(document.createTextNode(', '));
+                        }
+                        const artistSpan = document.createElement('span');
+                        artistSpan.className = 'artist-name';
+                        artistSpan.textContent = artist.NameEnglish || artist.NameOriginal;
+                        artistsContainer.appendChild(artistSpan);
+                    });
+                } else {
+                    artistsContainer.textContent = 'Unknown Artist';
+                }
+
+                // Update units with styled elements (if any)
+                const unitsContainer = document.getElementById('song-units-container');
+                unitsContainer.innerHTML = '';
+                if (data.units && data.units.length > 0) {
+                    const unitLabel = document.createElement('span');
+                    unitLabel.textContent = (data.units.length === 1 ? 'Group: ' : 'Groups: ');
+                    unitsContainer.appendChild(unitLabel);
+
+                    data.units.forEach((unit, index) => {
+                        if (index > 0) {
+                            unitsContainer.appendChild(document.createTextNode(', '));
+                        }
+                        const unitSpan = document.createElement('span');
+                        unitSpan.className = 'unit-name';
+                        unitSpan.textContent = unit.NameEnglish || unit.NameOriginal;
+                        unitsContainer.appendChild(unitSpan);
+                    });
+                }
+
+                // Update albums with styled elements (if any)
+                const albumsContainer = document.getElementById('song-albums-container');
+                albumsContainer.innerHTML = '';
+                if (data.albums && data.albums.length > 0) {
+                    const albumLabel = document.createElement('span');
+                    albumLabel.textContent = (data.albums.length === 1 ? 'Album: ' : 'Albums: ');
+                    albumsContainer.appendChild(albumLabel);
+
+                    data.albums.forEach((album, index) => {
+                        if (index > 0) {
+                            albumsContainer.appendChild(document.createTextNode(', '));
+                        }
+                        const albumSpan = document.createElement('span');
+                        albumSpan.className = 'album-name';
+                        // Display both names if they differ
+                        if (album.NameEnglish && album.NameEnglish !== album.NameOriginal) {
+                            albumSpan.textContent = `${album.NameOriginal} (${album.NameEnglish})`;
+                        } else {
+                            albumSpan.textContent = album.NameOriginal;
+                        }
+                        albumsContainer.appendChild(albumSpan);
+                    });
+                }
+
+                // Update category and tags
+                const tagsContainer = document.getElementById('song-tags-container');
+                tagsContainer.innerHTML = '';
+                if (data.category || data.is_cover) {
+                    const label = document.createElement('span');
+                    label.textContent = 'Tags: ';
+                    tagsContainer.appendChild(label);
+
+                    if (data.category) {
+                        const categorySpan = document.createElement('span');
+                        categorySpan.className = 'category';
+                        categorySpan.textContent = data.category;
+                        tagsContainer.appendChild(categorySpan);
+                    }
+
+                    if (data.is_cover) {
+                        if (data.category) {
+                            tagsContainer.appendChild(document.createTextNode(' '));
+                        }
+                        const coverSpan = document.createElement('span');
+                        coverSpan.className = 'category';
+                        coverSpan.style.background = '#28a745';
+                        coverSpan.textContent = 'Cover';
+                        tagsContainer.appendChild(coverSpan);
+                    }
+                } else {
+                    tagsContainer.textContent = 'No Tags';
+                }
+
+                songInfo.style.display = 'block';
+
+                // Initialize colors for the new song data
+                const songData = [{
+                    SongID: data.song_id,
+                    Artists: data.artists,
+                    Units: data.units
+                }];
+                initializeAllColors(songData);
+
+                // Update video
+                if (data.embed_url) {
+                    const videoContainer = document.getElementById('video-container');
+                    const noVideoElement = document.getElementById('no-video');
+
+                    if (noVideoElement) {
+                        noVideoElement.style.display = 'none';
+                    }
+
+                    // Extract YouTube video ID from embed URL
+                    const videoId = this.extractYouTubeId(data.embed_url);
+
+                    // Clear old player if exists
+                    if (this.player) {
+                        this.player.destroy();
+                    }
+
+                    // Create container for new player
+                    videoContainer.innerHTML = '<div id="video-player"></div>';
+
+                    // Initialize YouTube player
+                    this.initYouTubePlayer(videoId);
+                }
+            }
+
+            handleVideoSync(data) {
+                if (!this.player || this.isSyncing || !this.videoSyncEnabled) return;
+
+                this.isSyncing = true;
+
+                const currentTime = this.player.getCurrentTime();
+                const timeDiff = Math.abs(currentTime - data.time);
+
+                // Only sync if difference is significant (more than 2 seconds)
+                if (timeDiff > 2) {
+                    this.player.seekTo(data.time, true);
+                }
+
+                // Sync play state
+                const playerState = this.player.getPlayerState();
+                if (data.is_playing && playerState !== YT.PlayerState.PLAYING) {
+                    this.player.playVideo();
+                } else if (!data.is_playing && playerState === YT.PlayerState.PLAYING) {
+                    this.player.pauseVideo();
+                }
+
+                setTimeout(() => {
+                    this.isSyncing = false;
+                }, 200);
+            }
+
+            initYouTubePlayer(videoId) {
+                // Wait for YouTube API to be ready
+                if (typeof YT === 'undefined' || !YT.Player) {
+                    setTimeout(() => this.initYouTubePlayer(videoId), 100);
+                    return;
+                }
+
+                this.player = new YT.Player('video-player', {
+                    videoId: videoId,
+                    playerVars: {
+                        autoplay: 1, // Enable autoplay
+                        controls: 1,
+                        modestbranding: 1,
+                        rel: 0
+                    },
+                    events: {
+                        onReady: (event) => {
+                            this.setupPlayerListeners();
+                            // Autoplay the video when ready
+                            event.target.playVideo();
+                        },
+                        onStateChange: (event) => {
+                            this.onPlayerStateChange(event);
+                        }
+                    }
+                });
+            }
+
+            setupPlayerListeners() {
+                // Broadcast state changes periodically
+                if (this.syncInterval) {
+                    clearInterval(this.syncInterval);
+                }
+
+                this.syncInterval = setInterval(() => {
+                    if (this.player && !this.isSyncing && this.videoSyncEnabled) {
+                        const state = this.player.getPlayerState();
+                        const time = this.player.getCurrentTime();
+
+                        this.sendMessage('video_sync', {
+                            time: time,
+                            is_playing: state === YT.PlayerState.PLAYING
+                        });
+                    }
+                }, 3000); // Sync every 3 seconds
+            }
+
+            onPlayerStateChange(event) {
+                // Don't broadcast if we're currently syncing from another user
+                if (this.isSyncing || !this.videoSyncEnabled) return;
+
+                const time = this.player.getCurrentTime();
+
+                // Only broadcast on actual play/pause state changes
+                if (event.data === YT.PlayerState.PLAYING || event.data === YT.PlayerState.PAUSED) {
+                    this.sendMessage('video_sync', {
+                        time: time,
+                        is_playing: event.data === YT.PlayerState.PLAYING
+                    });
+                }
+
+                // Auto-advance to next song when current song ends
+                if (event.data === YT.PlayerState.ENDED) {
+                    console.log('Song ended, advancing to next song');
+                    this.sendMessage('next_song', {});
+                }
+            }
+
+            extractYouTubeId(url) {
+                // Extract video ID from YouTube embed URL
+                // Format: https://www.youtube.com/embed/VIDEO_ID
+                const match = url.match(/embed\/([^?]+)/);
+                return match ? match[1] : null;
+            }
+
+            handleVoteUpdate(data) {
+                this.userVotes.set(data.user_id, {
+                    username: data.username,
+                    rating: data.rating,
+                    comment: data.comment
+                });
+
+                this.updateVotesList();
+                this.updateUserVotingStatus(); // Update user status icons
+            }
+
+            handleUserUpdate(data) {
+                this.currentUsers = data.users;
+                const usersList = document.getElementById('users-list');
+                usersList.innerHTML = '';
+
+                data.users.forEach(user => {
+                    const userElement = document.createElement('div');
+                    userElement.className = 'user-item';
+                    userElement.innerHTML = `
+                        <span class="username">${user.username}</span>
+                        <span class="user-status ${this.userVotes.has(user.id) ? 'voted' : 'pending'}">
+                            ${this.userVotes.has(user.id) ? '✓' : '⏳'}
+                        </span>
+                    `;
+                    usersList.appendChild(userElement);
+                });
+            }
+
+            updateUserVotingStatus() {
+                // Update voting status icons based on current votes
+                if (!this.currentUsers) return;
+
+                const usersList = document.getElementById('users-list');
+                usersList.innerHTML = '';
+
+                this.currentUsers.forEach(user => {
+                    const userElement = document.createElement('div');
+                    userElement.className = 'user-item';
+                    userElement.innerHTML = `
+                        <span class="username">${user.username}</span>
+                        <span class="user-status ${this.userVotes.has(user.id) ? 'voted' : 'pending'}">
+                            ${this.userVotes.has(user.id) ? '✓' : '⏳'}
+                        </span>
+                    `;
+                    usersList.appendChild(userElement);
+                });
+            }
+
+            updateVotesList() {
+                const votesList = document.getElementById('votes-list');
+                votesList.innerHTML = '';
+
+                if (this.userVotes.size === 0) {
+                    votesList.innerHTML = '<p class="no-votes">No votes yet for this song</p>';
+                    return;
+                }
+
+                for (const [userId, vote] of this.userVotes) {
+                    const voteElement = document.createElement('div');
+                    voteElement.className = 'vote-item';
+                    voteElement.innerHTML = `
+                        <div class="vote-header">
+                            <span class="voter-name">${vote.username}</span>
+                            <span class="vote-rating">${vote.rating}/10</span>
+                        </div>
+                        ${vote.comment ? `<div class="vote-comment">${vote.comment}</div>` : ''}
+                    `;
+                    votesList.appendChild(voteElement);
+                }
+            }
+
+            sendMessage(type, data) {
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.send(JSON.stringify({
+                        type: type,
+                        data: data,
+                        timestamp: new Date().toISOString()
+                    }));
+                }
+            }
+
+            getCurrentUserId() {
+                return '{{.user_id}}';
+            }
+
+            getCurrentUsername() {
+                return '{{.username}}';
+            }
+        }
+
+        // Initialize radio room when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            const roomId = '{{.room_id}}';
+            window.radioRoom = new RadioRoom(roomId);
+        });
+    </script>
+</body>
+</html>
+{{end}}

@@ -35,6 +35,10 @@ func main() {
 	handlers.StartDatabaseCleanup(db.DB)
 	log.Println("Started database cleanup routine for rating rooms")
 
+	// Start background cleanup for old radio rooms
+	handlers.StartRadioRoomDatabaseCleanup(db.DB)
+	log.Println("Started database cleanup routine for radio rooms")
+
 	// Start web server
 	r := router.SetupRouter(db.DB)
 
