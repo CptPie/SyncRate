@@ -41,14 +41,15 @@ type RoomManager struct {
 type MessageType string
 
 const (
-	MsgJoinRoom    MessageType = "join_room"
-	MsgLeaveRoom   MessageType = "leave_room"
-	MsgSongChange  MessageType = "song_change"
-	MsgVideoSync   MessageType = "video_sync"
-	MsgVoteUpdate  MessageType = "vote_update"
-	MsgUserUpdate  MessageType = "user_update"
-	MsgNextSong    MessageType = "next_song"
-	MsgError       MessageType = "error"
+	MsgJoinRoom      MessageType = "join_room"
+	MsgLeaveRoom     MessageType = "leave_room"
+	MsgSongChange    MessageType = "song_change"
+	MsgVideoSync     MessageType = "video_sync"
+	MsgVoteUpdate    MessageType = "vote_update"
+	MsgUserUpdate    MessageType = "user_update"
+	MsgNextSong      MessageType = "next_song"
+	MsgRoomSettings  MessageType = "room_settings"
+	MsgError         MessageType = "error"
 )
 
 // WebSocket message structure
@@ -120,6 +121,10 @@ type UserUpdateData struct {
 type UserInfo struct {
 	ID       string `json:"id"`
 	Username string `json:"username"`
+}
+
+type RoomSettingsData struct {
+	VideoSyncEnabled bool `json:"video_sync_enabled"`
 }
 
 // NewRoomManager creates a new room manager

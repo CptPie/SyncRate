@@ -106,8 +106,9 @@ func PostCreateRatingRoom(db *gorm.DB) gin.HandlerFunc {
 
 		// Parse request body for filters
 		var requestBody struct {
-			CategoryID *uint `json:"category_id"`
-			CoversOnly bool  `json:"covers_only"`
+			CategoryID       *uint `json:"category_id"`
+			CoversOnly       bool  `json:"covers_only"`
+			VideoSyncEnabled bool  `json:"video_sync_enabled"`
 		}
 
 		// Bind JSON, but don't fail if body is empty (filters are optional)
@@ -115,17 +116,21 @@ func PostCreateRatingRoom(db *gorm.DB) gin.HandlerFunc {
 			log.Printf("Error parsing request body: %v", err)
 		}
 
+		log.Printf("Request body received: %+v", requestBody)
+		log.Printf("Creating room with VideoSyncEnabled: %v", requestBody.VideoSyncEnabled)
+
 		// Generate unique room code
 		roomID := generateRoomCode()
 
 		// Create room in database
 		room := models.RatingRoom{
-			RoomID:     roomID,
-			CreatorID:  userID.(uint),
-			CategoryID: requestBody.CategoryID,
-			CoversOnly: requestBody.CoversOnly,
-			CreatedAt:  time.Now(),
-			LastActive: time.Now(),
+			RoomID:          roomID,
+			CreatorID:       userID.(uint),
+			CategoryID:      requestBody.CategoryID,
+			CoversOnly:      requestBody.CoversOnly,
+			VideoSyncEnabled: &requestBody.VideoSyncEnabled,
+			CreatedAt:       time.Now(),
+			LastActive:      time.Now(),
 		}
 
 		if err := db.Create(&room).Error; err != nil {
@@ -267,6 +272,22 @@ func sendRoomState(db *gorm.DB, roomID string, conn *websocket.Conn) {
 	if err := db.Preload("CurrentSong").Where("room_id = ?", roomID).First(&room).Error; err != nil {
 		return
 	}
+
+	// Send room settings first
+	videoSyncEnabled := true // default value
+	if room.VideoSyncEnabled != nil {
+		videoSyncEnabled = *room.VideoSyncEnabled
+	}
+	log.Printf("Sending room settings for room %s: VideoSyncEnabled=%v", roomID, videoSyncEnabled)
+	settingsData, _ := json.Marshal(wsocket.RoomSettingsData{
+		VideoSyncEnabled: videoSyncEnabled,
+	})
+	settingsMessage := wsocket.WSMessage{
+		Type:      wsocket.MsgRoomSettings,
+		Data:      settingsData,
+		Timestamp: time.Now(),
+	}
+	conn.WriteJSON(settingsMessage)
 
 	// If there's a current song, send it
 	if room.CurrentSong != nil {

@@ -43,6 +43,14 @@
                             <span>Covers Only</span>
                         </label>
                     </div>
+
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="video-sync-enabled" checked>
+                            <span>Enable Video Synchronization</span>
+                        </label>
+                        <p class="checkbox-description">When enabled, video playback will be synced across all users in the room</p>
+                    </div>
                 </div>
 
                 <button id="create-room-btn" class="btn-primary">
@@ -81,6 +89,7 @@
             // Get filter values
             const categoryId = document.getElementById('category-filter').value;
             const coversOnly = document.getElementById('covers-only-filter').checked;
+            const videoSyncEnabled = document.getElementById('video-sync-enabled').checked;
 
             // Build request body
             const requestBody = {};
@@ -90,6 +99,8 @@
             if (coversOnly) {
                 requestBody.covers_only = true;
             }
+            // Always send video sync preference (defaults to true if not explicitly set)
+            requestBody.video_sync_enabled = videoSyncEnabled;
 
             try {
                 const response = await fetch('/create-rating-room', {

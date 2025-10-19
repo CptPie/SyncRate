@@ -125,6 +125,7 @@
                 this.isSyncing = false; // Prevent sync loops
                 this.syncInterval = null;
                 this.userInteracted = false; // Track if user has interacted with player
+                this.videoSyncEnabled = true; // Default to true, will be set by room settings
 
                 this.initWebSocket();
                 this.initEventListeners();
@@ -180,6 +181,9 @@
 
             handleMessage(message) {
                 switch (message.type) {
+                    case 'room_settings':
+                        this.handleRoomSettings(message.data);
+                        break;
                     case 'song_change':
                         this.handleSongChange(message.data);
                         break;
@@ -197,6 +201,11 @@
                         this.handleError(message.error);
                         break;
                 }
+            }
+
+            handleRoomSettings(data) {
+                this.videoSyncEnabled = data.video_sync_enabled;
+                console.log('Video sync enabled:', this.videoSyncEnabled);
             }
 
             handleError(errorMessage) {
@@ -362,7 +371,7 @@
             }
 
             handleVideoSync(data) {
-                if (!this.player || this.isSyncing) return;
+                if (!this.player || this.isSyncing || !this.videoSyncEnabled) return;
 
                 this.isSyncing = true;
 
@@ -423,7 +432,7 @@
                 }
 
                 this.syncInterval = setInterval(() => {
-                    if (this.player && !this.isSyncing) {
+                    if (this.player && !this.isSyncing && this.videoSyncEnabled) {
                         const state = this.player.getPlayerState();
                         const time = this.player.getCurrentTime();
 
@@ -436,8 +445,8 @@
             }
 
             onPlayerStateChange(event) {
-                // Don't broadcast if we're currently syncing from another user
-                if (this.isSyncing) return;
+                // Don't broadcast if we're currently syncing from another user or sync is disabled
+                if (this.isSyncing || !this.videoSyncEnabled) return;
 
                 const time = this.player.getCurrentTime();
                 const isPlaying = event.data === YT.PlayerState.PLAYING || event.data === YT.PlayerState.BUFFERING;
