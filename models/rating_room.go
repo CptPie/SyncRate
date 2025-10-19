@@ -7,8 +7,9 @@ type RatingRoom struct {
 	CreatorID       uint      `gorm:"not null"`
 	CurrentSongID   *uint     `gorm:"index"`
 	CategoryID      *uint     `gorm:"index"`
-	CoversOnly      bool      `gorm:"default:false"`
-	VideoSyncEnabled *bool    `gorm:"default:true"`
+	CoversOnly       bool      `gorm:"default:false"`
+	VideoSyncEnabled *bool     `gorm:"default:true"`
+	UnvotedSongsOnly *bool     `gorm:"default:true"`
 	CreatedAt       time.Time
 	LastActive      time.Time `gorm:"index"`
 

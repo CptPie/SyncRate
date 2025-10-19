@@ -126,6 +126,7 @@
                 this.syncInterval = null;
                 this.userInteracted = false; // Track if user has interacted with player
                 this.videoSyncEnabled = true; // Default to true, will be set by room settings
+                this.currentUsers = []; // Store current users for status updates
 
                 this.initWebSocket();
                 this.initEventListeners();
@@ -219,9 +220,37 @@
             }
 
             handleSongChange(data) {
+                console.log('Song change data:', data);
+                console.log('Existing votes:', data.existing_votes);
+
                 this.currentSongId = data.song_id;
                 this.hasVoted = false;
                 this.userVotes.clear();
+
+                // Load existing votes if any
+                if (data.existing_votes && data.existing_votes.length > 0) {
+                    console.log('Loading', data.existing_votes.length, 'existing votes');
+                    data.existing_votes.forEach(vote => {
+                        console.log('Adding vote from user', vote.user_id, ':', vote);
+                        this.userVotes.set(vote.user_id, {
+                            username: vote.username,
+                            rating: vote.rating,
+                            comment: vote.comment
+                        });
+
+                        // Check if this is our vote
+                        if (vote.user_id === this.getCurrentUserId()) {
+                            this.hasVoted = true;
+                            this.showCurrentVote(vote.rating, vote.comment);
+                        }
+                    });
+                    console.log('User votes map after loading:', this.userVotes);
+                    this.updateVotesList();
+                    this.updateUserVotingStatus(); // Update user status icons
+                } else {
+                    console.log('No existing votes to load');
+                    this.updateUserVotingStatus(); // Reset all status icons to pending
+                }
 
                 // Update song info and data-song-id for color initialization
                 const songInfo = document.getElementById('song-info');
@@ -364,10 +393,27 @@
                 // Show voting section
                 document.getElementById('voting-title').textContent = 'Rate This Song';
                 document.getElementById('no-song-message').style.display = 'none';
-                this.showVoteForm();
 
-                // Clear previous votes
-                document.getElementById('votes-list').innerHTML = '<p class="no-votes">No votes yet for this song</p>';
+                // Always show vote form, but prepopulate if user has already voted
+                document.getElementById('vote-form').style.display = 'block';
+                document.getElementById('current-vote').style.display = 'none';
+
+                // If user has voted, prepopulate the form with their existing vote
+                if (this.hasVoted) {
+                    const currentUserId = this.getCurrentUserId();
+                    const existingVote = this.userVotes.get(currentUserId);
+                    if (existingVote) {
+                        document.getElementById('rating').value = existingVote.rating;
+                        document.getElementById('comment').value = existingVote.comment || '';
+                    }
+                } else {
+                    // Reset form for new vote
+                    document.getElementById('rating').value = '';
+                    document.getElementById('comment').value = '';
+                }
+
+                // Update votes list (will show "No votes" if userVotes is empty)
+                this.updateVotesList();
             }
 
             handleVideoSync(data) {
@@ -477,17 +523,41 @@
                 // Check if this is our vote
                 if (data.user_id === this.getCurrentUserId()) {
                     this.hasVoted = true;
-                    this.showCurrentVote(data.rating, data.comment);
+                    // Keep the form visible and prepopulate with the submitted vote
+                    document.getElementById('rating').value = data.rating;
+                    document.getElementById('comment').value = data.comment || '';
                 }
 
                 this.updateVotesList();
+                this.updateUserVotingStatus(); // Update user status icons
             }
 
             handleUserUpdate(data) {
+                this.currentUsers = data.users; // Store for later reference
                 const usersList = document.getElementById('users-list');
                 usersList.innerHTML = '';
 
                 data.users.forEach(user => {
+                    const userElement = document.createElement('div');
+                    userElement.className = 'user-item';
+                    userElement.innerHTML = `
+                        <span class="username">${user.username}</span>
+                        <span class="user-status ${this.userVotes.has(user.id) ? 'voted' : 'pending'}">
+                            ${this.userVotes.has(user.id) ? '✓' : '⏳'}
+                        </span>
+                    `;
+                    usersList.appendChild(userElement);
+                });
+            }
+
+            updateUserVotingStatus() {
+                // Update voting status icons based on current votes
+                if (!this.currentUsers) return;
+
+                const usersList = document.getElementById('users-list');
+                usersList.innerHTML = '';
+
+                this.currentUsers.forEach(user => {
                     const userElement = document.createElement('div');
                     userElement.className = 'user-item';
                     userElement.innerHTML = `

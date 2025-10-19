@@ -109,6 +109,7 @@ func PostCreateRatingRoom(db *gorm.DB) gin.HandlerFunc {
 			CategoryID       *uint `json:"category_id"`
 			CoversOnly       bool  `json:"covers_only"`
 			VideoSyncEnabled bool  `json:"video_sync_enabled"`
+			UnvotedSongsOnly bool  `json:"unvoted_songs_only"`
 		}
 
 		// Bind JSON, but don't fail if body is empty (filters are optional)
@@ -129,6 +130,7 @@ func PostCreateRatingRoom(db *gorm.DB) gin.HandlerFunc {
 			CategoryID:      requestBody.CategoryID,
 			CoversOnly:      requestBody.CoversOnly,
 			VideoSyncEnabled: &requestBody.VideoSyncEnabled,
+		UnvotedSongsOnly: &requestBody.UnvotedSongsOnly,
 			CreatedAt:       time.Now(),
 			LastActive:      time.Now(),
 		}
@@ -345,6 +347,9 @@ func sendRoomState(db *gorm.DB, roomID string, conn *websocket.Conn) {
 				categoryName = song.Category.Name
 			}
 
+			// Load existing votes for this song
+			existingVotes := loadExistingVotes(db, roomID, song.SongID)
+
 			// Send song change message
 			songData := wsocket.SongChangeData{
 				SongID:            song.SongID,
@@ -357,6 +362,7 @@ func sendRoomState(db *gorm.DB, roomID string, conn *websocket.Conn) {
 				Albums:            albums,
 				Category:          categoryName,
 				IsCover:           song.IsCover,
+				ExistingVotes:     existingVotes,
 			}
 
 			data, _ := json.Marshal(songData)
@@ -505,34 +511,53 @@ func findNextUnratedSong(db *gorm.DB, roomID string) *models.Song {
 		baseQuery = baseQuery.Where("is_cover = ?", true)
 	}
 
-	// Find songs that haven't been rated by at least one user in the room
-	var song models.Song
-	err := baseQuery.
-		Where("song_id NOT IN (?)",
-			db.Table("votes").
-				Select("DISTINCT song_id").
-				Where("user_id IN ?", userIDs).
-				Group("song_id").
-				Having("COUNT(DISTINCT user_id) = ?", len(userIDs)),
-		).
-		Order("RANDOM()").
-		First(&song).Error
+	// Check if we should only show unvoted songs
+	unvotedOnly := true // default value
+	if dbRoom.UnvotedSongsOnly != nil {
+		unvotedOnly = *dbRoom.UnvotedSongsOnly
+	}
 
-	if err != nil {
-		// If no completely unrated songs, find songs rated by fewer than all users
+	var song models.Song
+	var err error
+
+	if unvotedOnly {
+		// Find songs that haven't been rated by at least one user in the room
 		err = baseQuery.
 			Where("song_id NOT IN (?)",
 				db.Table("votes").
-					Select("song_id").
+					Select("DISTINCT song_id").
 					Where("user_id IN ?", userIDs).
 					Group("song_id").
-					Having("COUNT(*) >= ?", len(userIDs)),
+					Having("COUNT(DISTINCT user_id) = ?", len(userIDs)),
 			).
 			Order("RANDOM()").
 			First(&song).Error
 
 		if err != nil {
-			// All songs have been rated by all users
+			// If no completely unrated songs, find songs rated by fewer than all users
+			err = baseQuery.
+				Where("song_id NOT IN (?)",
+					db.Table("votes").
+						Select("song_id").
+						Where("user_id IN ?", userIDs).
+						Group("song_id").
+						Having("COUNT(*) >= ?", len(userIDs)),
+				).
+				Order("RANDOM()").
+				First(&song).Error
+
+			if err != nil {
+				// All songs have been rated by all users
+				return nil
+			}
+		}
+	} else {
+		// Allow any song (including previously voted ones)
+		err = baseQuery.
+			Order("RANDOM()").
+			First(&song).Error
+
+		if err != nil {
 			return nil
 		}
 	}
@@ -601,6 +626,9 @@ func broadcastSongChange(db *gorm.DB, roomID string, song models.Song) {
 		categoryName = song.Category.Name
 	}
 
+	// Load existing votes for this song
+	existingVotes := loadExistingVotes(db, roomID, song.SongID)
+
 	// Create song change message
 	songData := wsocket.SongChangeData{
 		SongID:            song.SongID,
@@ -613,6 +641,7 @@ func broadcastSongChange(db *gorm.DB, roomID string, song models.Song) {
 		Albums:            albums,
 		Category:          categoryName,
 		IsCover:           song.IsCover,
+		ExistingVotes:     existingVotes,
 	}
 
 	data, _ := json.Marshal(songData)
@@ -626,6 +655,45 @@ func broadcastSongChange(db *gorm.DB, roomID string, song models.Song) {
 }
 
 // Helper functions
+
+// loadExistingVotes loads all votes for a specific song from users currently in the room
+func loadExistingVotes(db *gorm.DB, roomID string, songID uint) []wsocket.VoteUpdateData {
+	// Get all users in the room
+	room, exists := roomManager.GetRoom(roomID)
+	if !exists {
+		return []wsocket.VoteUpdateData{}
+	}
+
+	room.Mutex.RLock()
+	userIDs := make([]string, 0, len(room.Clients))
+	usernames := make(map[string]string) // map user_id to username
+	for userID, client := range room.Clients {
+		userIDs = append(userIDs, userID)
+		usernames[userID] = client.Username
+	}
+	room.Mutex.RUnlock()
+
+	if len(userIDs) == 0 {
+		return []wsocket.VoteUpdateData{}
+	}
+
+	// Load votes for this song from these users
+	var votes []models.Vote
+	db.Where("song_id = ? AND user_id IN ?", songID, userIDs).Find(&votes)
+
+	// Convert to VoteUpdateData
+	voteData := make([]wsocket.VoteUpdateData, 0, len(votes))
+	for _, vote := range votes {
+		voteData = append(voteData, wsocket.VoteUpdateData{
+			UserID:   fmt.Sprintf("%d", vote.UserID),
+			Username: usernames[fmt.Sprintf("%d", vote.UserID)],
+			Rating:   vote.Rating,
+			Comment:  vote.Comment,
+		})
+	}
+
+	return voteData
+}
 
 // updateRoomActivity updates the last_active timestamp for a room
 func updateRoomActivity(db *gorm.DB, roomID string) {

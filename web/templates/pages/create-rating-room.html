@@ -51,6 +51,14 @@
                         </label>
                         <p class="checkbox-description">When enabled, video playback will be synced across all users in the room</p>
                     </div>
+
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="unvoted-songs-only" checked>
+                            <span>Unvoted Songs Only</span>
+                        </label>
+                        <p class="checkbox-description">When enabled, only shows songs that haven't been rated yet. When disabled, allows re-rating previously voted songs</p>
+                    </div>
                 </div>
 
                 <button id="create-room-btn" class="btn-primary">
@@ -90,6 +98,7 @@
             const categoryId = document.getElementById('category-filter').value;
             const coversOnly = document.getElementById('covers-only-filter').checked;
             const videoSyncEnabled = document.getElementById('video-sync-enabled').checked;
+            const unvotedSongsOnly = document.getElementById('unvoted-songs-only').checked;
 
             // Build request body
             const requestBody = {};
@@ -101,6 +110,8 @@
             }
             // Always send video sync preference (defaults to true if not explicitly set)
             requestBody.video_sync_enabled = videoSyncEnabled;
+            // Always send unvoted songs only preference (defaults to true if not explicitly set)
+            requestBody.unvoted_songs_only = unvotedSongsOnly;
 
             try {
                 const response = await fetch('/create-rating-room', {
