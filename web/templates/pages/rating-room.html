@@ -453,7 +453,7 @@
                 this.player = new YT.Player('video-player', {
                     videoId: videoId,
                     playerVars: {
-                        autoplay: 0, // Don't autoplay to avoid browser blocking
+                        autoplay: 1, // Enable autoplay
                         controls: 1,
                         modestbranding: 1,
                         rel: 0
@@ -461,7 +461,8 @@
                     events: {
                         onReady: (event) => {
                             this.setupPlayerListeners();
-                            // Mark that user can now interact
+                            // Autoplay the video when ready
+                            event.target.playVideo();
                             this.userInteracted = true;
                         },
                         onStateChange: (event) => {
