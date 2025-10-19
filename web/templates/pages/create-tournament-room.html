@@ -1,0 +1,260 @@
+{{define "create-tournament-room.html"}}
+<!doctype html>
+<html lang="en">
+  <head>
+    {{template "head" .}}
+  </head>
+  <body>
+    <div class="container">
+      {{template "header" .}}
+      <main>
+        <div class="form-container">
+          <h2>Create Tournament Room</h2>
+          <p>
+            Create a tournament bracket where songs compete head-to-head until a
+            champion emerges!
+          </p>
+
+          <div class="room-info">
+            <h3>How it works:</h3>
+            <ul>
+              <li>🏆 Songs compete in elimination-style matches</li>
+              <li>👥 All users vote on which song advances</li>
+              <li>🎵 Watch both songs side-by-side in match view</li>
+              <li>⭐ Rate songs during matches</li>
+              <li>
+                🥇 Winner advances to the next round until a champion is crowned
+              </li>
+            </ul>
+          </div>
+
+          <div class="filter-section">
+            <h3>Tournament Settings</h3>
+
+            <div class="form-group">
+              <label for="tree-size">Tournament Size:</label>
+              <select id="tree-size" class="filter-select" required>
+                <option value="8">8 Songs (3 rounds)</option>
+                <option value="16">16 Songs (4 rounds)</option>
+                <option value="32" selected>32 Songs (5 rounds)</option>
+                <option value="64">64 Songs (6 rounds)</option>
+                <option value="128">128 Songs (7 rounds)</option>
+              </select>
+              <p class="checkbox-description">
+                Number of songs in the tournament bracket
+              </p>
+            </div>
+
+            <div class="form-group">
+              <label for="category-filter">Category Filter:</label>
+              <select id="category-filter" class="filter-select">
+                <option value="">All Categories</option>
+                {{range .categories}}
+                <option value="{{.CategoryID}}">{{.Name}}</option>
+                {{end}}
+              </select>
+              <p class="checkbox-description">
+                Only include songs from a specific category
+              </p>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="voted-only-filter" />
+                <span>Voted Songs Only</span>
+              </label>
+              <p class="checkbox-description">
+                Only include songs you have already voted on
+              </p>
+            </div>
+
+            <div class="form-group" id="voted-ratio-group">
+              <label for="voted-ratio">Voted/Unvoted Ratio:</label>
+              <select id="voted-ratio" class="filter-select">
+                <option value="0.0">All Unvoted</option>
+                <option value="0.25">25% Voted / 75% Unvoted</option>
+                <option value="0.5" selected>50% Voted / 50% Unvoted</option>
+                <option value="0.75">75% Voted / 25% Unvoted</option>
+                <option value="1.0">All Voted</option>
+              </select>
+              <p class="checkbox-description">
+                Ratio of voted vs unvoted songs to include
+              </p>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="covers-only-filter" />
+                <span>Covers Only</span>
+              </label>
+              <p class="checkbox-description">Only include cover songs</p>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="video-sync-enabled" checked />
+                <span>Enable Video Synchronization</span>
+              </label>
+              <p class="checkbox-description">
+                Sync video playback across all users during matches
+              </p>
+            </div>
+          </div>
+
+          <button id="create-room-btn" class="btn-primary">
+            Create Tournament
+          </button>
+
+          <div id="room-result" class="room-result" style="display: none">
+            <h3>Tournament Created!</h3>
+            <div class="room-details">
+              <div class="room-code-section">
+                <label>Room Code:</label>
+                <div class="room-code" id="room-code"></div>
+                <button id="copy-code-btn" class="btn-secondary">
+                  Copy Code
+                </button>
+              </div>
+              <div class="room-url-section">
+                <label>Share URL:</label>
+                <div class="room-url" id="room-url"></div>
+                <button id="copy-url-btn" class="btn-secondary">
+                  Copy URL
+                </button>
+              </div>
+              <a id="join-room-link" class="btn-primary">Enter Tournament</a>
+            </div>
+          </div>
+
+          <div
+            id="error-message"
+            class="error-message"
+            style="display: none"
+          ></div>
+        </div>
+      </main>
+    </div>
+
+    <script src="/static/js/theme-toggle.js"></script>
+    <script>
+      // Toggle voted ratio visibility based on voted-only checkbox
+      document
+        .getElementById("voted-only-filter")
+        .addEventListener("change", function () {
+          const votedRatioGroup = document.getElementById("voted-ratio-group");
+          votedRatioGroup.style.display = this.checked ? "none" : "block";
+        });
+
+      document
+        .getElementById("create-room-btn")
+        .addEventListener("click", async function () {
+          const btn = this;
+          btn.disabled = true;
+          btn.textContent = "Creating Tournament...";
+
+          // Get values
+          const treeSize = parseInt(document.getElementById("tree-size").value);
+          const categoryId = document.getElementById("category-filter").value;
+          const votedOnly =
+            document.getElementById("voted-only-filter").checked;
+          const votedRatio = parseFloat(
+            document.getElementById("voted-ratio").value,
+          );
+          const coversOnly =
+            document.getElementById("covers-only-filter").checked;
+          const videoSyncEnabled =
+            document.getElementById("video-sync-enabled").checked;
+
+          // Build request body
+          const requestBody = {
+            tree_size: treeSize,
+            covers_only: coversOnly,
+            video_sync_enabled: videoSyncEnabled,
+          };
+
+          if (categoryId) {
+            requestBody.category_id = parseInt(categoryId);
+          }
+
+          if (votedOnly) {
+            requestBody.voted_only = true;
+          } else {
+            requestBody.voted_ratio = votedRatio;
+          }
+
+          try {
+            const response = await fetch("/create-tournament-room", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(requestBody),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+              // Show success result
+              document.getElementById("room-code").textContent = data.room_id;
+              document.getElementById("room-url").textContent =
+                window.location.origin + data.url;
+              document.getElementById("join-room-link").href = data.url;
+              document.getElementById("room-result").style.display = "block";
+              document.getElementById("error-message").style.display = "none";
+            } else {
+              // Show error
+              document.getElementById("error-message").textContent =
+                data.error || "Failed to create tournament";
+              document.getElementById("error-message").style.display = "block";
+              document.getElementById("room-result").style.display = "none";
+            }
+          } catch (error) {
+            document.getElementById("error-message").textContent =
+              "Network error occurred";
+            document.getElementById("error-message").style.display = "block";
+            document.getElementById("room-result").style.display = "none";
+          }
+
+          btn.disabled = false;
+          btn.textContent = "Create Tournament";
+        });
+
+      // Copy functionality
+      function copyRoomCode() {
+        const roomCode = document.getElementById("room-code").textContent;
+        navigator.clipboard.writeText(roomCode).then(() => {
+          const btn = document.getElementById("copy-code-btn");
+          btn.textContent = "Copied!";
+          setTimeout(() => {
+            btn.textContent = "Copy Code";
+          }, 2000);
+        });
+      }
+
+      function copyRoomUrl() {
+        const roomUrl = document.getElementById("room-url").textContent;
+        navigator.clipboard.writeText(roomUrl).then(() => {
+          const btn = document.getElementById("copy-url-btn");
+          btn.textContent = "Copied!";
+          setTimeout(() => {
+            btn.textContent = "Copy URL";
+          }, 2000);
+        });
+      }
+
+      document
+        .getElementById("copy-code-btn")
+        .addEventListener("click", copyRoomCode);
+      document
+        .getElementById("copy-url-btn")
+        .addEventListener("click", copyRoomUrl);
+      document
+        .getElementById("room-code")
+        .addEventListener("click", copyRoomCode);
+      document
+        .getElementById("room-url")
+        .addEventListener("click", copyRoomUrl);
+    </script>
+  </body>
+</html>
+{{end}}

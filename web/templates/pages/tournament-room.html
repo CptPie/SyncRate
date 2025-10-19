@@ -1,0 +1,1382 @@
+{{define "tournament-room.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {{template "head" .}}
+    <style>
+        .tournament-container {
+            padding: 20px;
+        }
+        .tournament-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .tournament-controls button {
+            margin-left: 10px;
+        }
+        .tournament-bracket {
+            position: relative;
+            display: flex;
+            gap: 40px;
+            overflow-x: auto;
+            padding: 20px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            min-height: 600px;
+        }
+        .bracket-round {
+            position: relative;
+            min-width: 250px;
+            z-index: 1;
+        }
+        .bracket-connections {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            overflow: visible;
+        }
+        .bracket-connection-line {
+            stroke: var(--border-color);
+            stroke-width: 2;
+            fill: none;
+        }
+        .bracket-connection-line.winner-path {
+            stroke: var(--accent-secondary);
+            stroke-width: 3;
+        }
+        .bracket-round h3 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: var(--accent-primary);
+        }
+        .bracket-match {
+            background: var(--bg-primary);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px;
+            margin: 10px 0;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+        .bracket-match:hover {
+            border-color: var(--accent-primary);
+            transform: translateX(5px);
+        }
+        .bracket-match.completed {
+            border-color: var(--accent-secondary);
+        }
+        .bracket-match.active {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 10px var(--accent-primary);
+        }
+        .match-song {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+            margin: 5px 0;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+        }
+        .match-song.winner {
+            background: var(--accent-primary);
+            border: 2px solid var(--accent-secondary);
+            font-weight: bold;
+            box-shadow: 0 0 8px var(--accent-primary);
+        }
+        .match-song img {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+        .match-song-info {
+            flex: 1;
+        }
+        .match-song-title {
+            font-weight: 500;
+            font-size: 14px;
+        }
+        .match-song-artist {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        .match-song-meta {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+            opacity: 0.8;
+        }
+        .match-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+        .match-modal.active {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .match-modal-content {
+            background: var(--bg-primary);
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 1400px;
+            width: 95%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .match-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .match-competitors {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 20px;
+        }
+        .competitor {
+            border: 3px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            background: var(--bg-secondary);
+        }
+        .competitor.picked {
+            border-color: var(--accent-primary);
+            background: var(--bg-accent);
+        }
+        .competitor-video {
+            width: 100%;
+            aspect-ratio: 16/9;
+            background: #000;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+        .competitor-info h3 {
+            margin-bottom: 10px;
+        }
+        .competitor-vote {
+            margin: 15px 0;
+            padding: 15px;
+            background: var(--bg-primary);
+            border-radius: 4px;
+        }
+        .competitor-pick {
+            margin-top: 15px;
+        }
+        .pick-status {
+            padding: 15px;
+            background: var(--bg-accent);
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .users-picks {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .user-pick-badge {
+            padding: 5px 10px;
+            background: var(--accent-primary);
+            color: white;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .warning-message {
+            background: #bf616a;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-weight: 500;
+            text-align: center;
+        }
+        .winner-announcement {
+            background: linear-gradient(135deg, #88c0d0 0%, #5e81ac 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+            animation: slideDown 0.5s ease-out;
+        }
+        .winner-announcement h3 {
+            font-size: 28px;
+            margin-bottom: 15px;
+            color: white;
+        }
+        .winner-song-title {
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .winner-reason {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        {{template "header" .}}
+        <main>
+            <div class="tournament-container">
+                <div class="tournament-header">
+                    <h2>Tournament: {{.room_id}}</h2>
+                    <div class="tournament-controls">
+                        <button id="start-tournament-btn" class="btn-primary" style="display:none;">Start Tournament</button>
+                        <button id="leave-room-btn" class="btn-secondary">Leave Room</button>
+                    </div>
+                </div>
+
+                <div class="users-section" style="margin-bottom: 20px;">
+                    <h4>Participants</h4>
+                    <div id="users-list" class="users-list" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <!-- Users will be populated via WebSocket -->
+                    </div>
+                </div>
+
+                <div id="tournament-bracket" class="tournament-bracket">
+                    <!-- Tournament bracket will be rendered here -->
+                </div>
+            </div>
+
+            <!-- Match Modal -->
+            <div id="match-modal" class="match-modal">
+                <div class="match-modal-content">
+                    <div class="match-modal-header">
+                        <h2 id="match-title">Match</h2>
+                        <div style="display: flex; gap: 10px;">
+                            <button id="next-match-btn" class="btn-primary">Results</button>
+                            <button id="close-match-btn" class="btn-secondary">Close</button>
+                        </div>
+                    </div>
+
+                    <div id="next-match-warning" class="warning-message" style="display: none;">
+                        ⚠️ Not all participants have picked yet. Are you sure you want to continue to the next match?
+                    </div>
+
+                    <div id="winner-announcement" class="winner-announcement" style="display: none;">
+                        <div class="winner-content">
+                            <h3>🏆 Winner</h3>
+                            <div id="winner-song-title" class="winner-song-title"></div>
+                            <div id="winner-reason" class="winner-reason"></div>
+                        </div>
+                    </div>
+
+                    <div class="pick-status" id="pick-status">
+                        Waiting for all users to pick their winner...
+                    </div>
+
+                    <div class="match-competitors">
+                        <!-- Song 1 -->
+                        <div class="competitor" id="competitor-1">
+                            <div class="competitor-video" id="video-container-1">
+                                <div id="video-player-1"></div>
+                            </div>
+                            <div class="competitor-info">
+                                <h3 id="song-title-1">Song 1</h3>
+                                <p id="song-artist-1">Artist</p>
+                            </div>
+                            <div class="competitor-vote">
+                                <label for="rating-1">Your Rating:</label>
+                                <select id="rating-1" class="form-select">
+                                    <option value="">Not rated</option>
+                                    <option value="1">1 - Terrible</option>
+                                    <option value="2">2 - Poor</option>
+                                    <option value="3">3 - Below Average</option>
+                                    <option value="4">4 - Fair</option>
+                                    <option value="5">5 - Average</option>
+                                    <option value="6">6 - Above Average</option>
+                                    <option value="7">7 - Good</option>
+                                    <option value="8">8 - Very Good</option>
+                                    <option value="9">9 - Excellent</option>
+                                    <option value="10">10 - Perfect</option>
+                                </select>
+                            </div>
+                            <div class="competitor-pick">
+                                <button id="pick-btn-1" class="btn-primary" style="width: 100%;">Pick This Song</button>
+                            </div>
+                        </div>
+
+                        <!-- Song 2 -->
+                        <div class="competitor" id="competitor-2">
+                            <div class="competitor-video" id="video-container-2">
+                                <div id="video-player-2"></div>
+                            </div>
+                            <div class="competitor-info">
+                                <h3 id="song-title-2">Song 2</h3>
+                                <p id="song-artist-2">Artist</p>
+                            </div>
+                            <div class="competitor-vote">
+                                <label for="rating-2">Your Rating:</label>
+                                <select id="rating-2" class="form-select">
+                                    <option value="">Not rated</option>
+                                    <option value="1">1 - Terrible</option>
+                                    <option value="2">2 - Poor</option>
+                                    <option value="3">3 - Below Average</option>
+                                    <option value="4">4 - Fair</option>
+                                    <option value="5">5 - Average</option>
+                                    <option value="6">6 - Above Average</option>
+                                    <option value="7">7 - Good</option>
+                                    <option value="8">8 - Very Good</option>
+                                    <option value="9">9 - Excellent</option>
+                                    <option value="10">10 - Perfect</option>
+                                </select>
+                            </div>
+                            <div class="competitor-pick">
+                                <button id="pick-btn-2" class="btn-primary" style="width: 100%;">Pick This Song</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="users-picks" id="users-picks">
+                        <!-- User picks will be shown here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/theme-toggle.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script>
+        class TournamentRoom {
+            constructor(roomId) {
+                this.roomId = roomId;
+                this.ws = null;
+                this.treeState = null;
+                this.status = 'setup';
+                this.currentMatchId = null;
+                this.currentUsers = [];
+                this.player1 = null;
+                this.player2 = null;
+                this.videoSyncEnabled = true;
+                this.currentMatch = null;
+                this.myPick = null;
+                this.svg = null;
+                this.roundDivs = [];
+                this.shouldAutoOpenFirstMatch = false;
+
+                this.initWebSocket();
+                this.initEventListeners();
+                this.setupResizeListener();
+            }
+
+            setupResizeListener() {
+                // Redraw lines on window resize
+                window.addEventListener('resize', () => {
+                    if (this.svg && this.roundDivs.length > 0) {
+                        this.drawBracketLines(this.svg, this.roundDivs);
+                    }
+                });
+            }
+
+            initWebSocket() {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/tournament-room/${this.roomId}/ws`;
+
+                this.ws = new WebSocket(wsUrl);
+                this.ws.onopen = () => console.log('Connected to tournament');
+                this.ws.onmessage = (event) => this.handleMessage(JSON.parse(event.data));
+                this.ws.onclose = () => console.log('Disconnected from tournament');
+                this.ws.onerror = (error) => console.error('WebSocket error:', error);
+            }
+
+            initEventListeners() {
+                document.getElementById('start-tournament-btn').addEventListener('click', () => {
+                    this.sendMessage('start_tournament', {});
+                });
+
+                document.getElementById('leave-room-btn').addEventListener('click', () => {
+                    window.location.href = '/';
+                });
+
+                document.getElementById('close-match-btn').addEventListener('click', () => {
+                    document.getElementById('match-modal').classList.remove('active');
+                    document.getElementById('next-match-warning').style.display = 'none';
+                });
+
+                document.getElementById('next-match-btn').addEventListener('click', () => {
+                    this.goToNextMatch();
+                });
+
+                document.getElementById('pick-btn-1').addEventListener('click', () => {
+                    this.pickWinner(1);
+                });
+
+                document.getElementById('pick-btn-2').addEventListener('click', () => {
+                    this.pickWinner(2);
+                });
+
+                // Rating change handlers
+                document.getElementById('rating-1').addEventListener('change', (e) => {
+                    this.submitRating(1, e.target.value);
+                });
+
+                document.getElementById('rating-2').addEventListener('change', (e) => {
+                    this.submitRating(2, e.target.value);
+                });
+            }
+
+            submitRating(songNumber, rating) {
+                if (!this.currentMatch || !rating) return;
+
+                const song = songNumber === 1 ? this.currentMatch.song1 : this.currentMatch.song2;
+                if (!song || !song.song_id) return;
+
+                const voteData = {
+                    user_id: this.getCurrentUserId(),
+                    username: '{{.username}}',
+                    song_id: song.song_id,
+                    rating: parseInt(rating),
+                    comment: ''
+                };
+
+                this.sendMessage('vote_update', voteData);
+            }
+
+            handleMessage(message) {
+                switch (message.type) {
+                    case 'tournament_state':
+                        this.handleTournamentState(message.data);
+                        break;
+                    case 'user_update':
+                        this.handleUserUpdate(message.data);
+                        break;
+                    case 'match_update':
+                        this.handleMatchUpdate(message.data);
+                        break;
+                    case 'open_match':
+                        this.handleOpenMatch(message.data);
+                        break;
+                    case 'navigate_match':
+                        this.handleNavigateMatch(message.data);
+                        break;
+                    case 'video_sync':
+                        this.handleVideoSync(message.data);
+                        break;
+                    case 'error':
+                        alert(message.error);
+                        break;
+                }
+            }
+
+            handleVideoSync(data) {
+                if (!this.videoSyncEnabled) return;
+
+                const playerNum = data.player_num;
+                const player = playerNum === 1 ? this.player1 : this.player2;
+
+                if (!player) return;
+
+                const currentTime = player.getCurrentTime();
+                const timeDiff = Math.abs(currentTime - data.time);
+
+                // Only sync if difference is significant (more than 2 seconds)
+                if (timeDiff > 2) {
+                    player.seekTo(data.time, true);
+                }
+
+                // Sync play state
+                const playerState = player.getPlayerState();
+                if (data.is_playing && playerState !== YT.PlayerState.PLAYING) {
+                    player.playVideo();
+                } else if (!data.is_playing && playerState === YT.PlayerState.PLAYING) {
+                    player.pauseVideo();
+                }
+            }
+
+            handleTournamentState(data) {
+                const wasInSetup = this.status === 'setup';
+
+                this.treeState = data.tree_state;
+                this.status = data.status;
+                this.currentMatchId = data.current_match_id;
+                this.videoSyncEnabled = data.video_sync_enabled;
+
+                this.renderBracket();
+
+                // Show start button if in setup
+                if (this.status === 'setup') {
+                    document.getElementById('start-tournament-btn').style.display = 'block';
+                }
+
+                // Update currently open match if it exists
+                if (this.currentMatch && this.currentMatch.match_id) {
+                    // Find updated match data in new tree state
+                    for (const round of this.treeState.rounds) {
+                        for (const match of round.matches) {
+                            if (match.match_id === this.currentMatch.match_id) {
+                                // Update current match reference
+                                this.currentMatch = match;
+                                // Update the pick status display
+                                this.updatePickStatus(match);
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Auto-open first match when tournament transitions from setup to in_progress
+                if (wasInSetup && this.status === 'in_progress' && this.currentMatchId) {
+                    console.log('Tournament started, opening first match');
+                    // Find and open the first match
+                    if (this.treeState && this.treeState.rounds && this.treeState.rounds.length > 0) {
+                        const firstRound = this.treeState.rounds[0];
+                        if (firstRound.matches && firstRound.matches.length > 0) {
+                            const firstMatch = firstRound.matches[0];
+                            if (firstMatch.song1 && firstMatch.song1.song_id && firstMatch.song2 && firstMatch.song2.song_id) {
+                                setTimeout(() => {
+                                    console.log('Opening first match for all users');
+                                    this.openMatch(firstMatch);
+                                }, 200);
+                            }
+                        }
+                    }
+                }
+            }
+
+            handleUserUpdate(data) {
+                this.currentUsers = data.users;
+                const usersList = document.getElementById('users-list');
+                usersList.innerHTML = '';
+
+                data.users.forEach(user => {
+                    const userBadge = document.createElement('span');
+                    userBadge.className = 'user-pick-badge';
+                    userBadge.textContent = user.username;
+                    usersList.appendChild(userBadge);
+                });
+            }
+
+            handleMatchUpdate(data) {
+                // This is called when individual match updates occur
+                // Since we broadcast full tournament_state on changes,
+                // this can be used for optimized partial updates if needed
+                // For now, we rely on tournament_state broadcasts
+                console.log('Match update received:', data);
+            }
+
+            handleOpenMatch(data) {
+                console.log('Received open_match message:', data);
+
+                // Find the match by match_id in the tree state
+                if (!this.treeState) {
+                    console.log('No tree state available yet');
+                    return;
+                }
+
+                if (!data.match_id) {
+                    console.log('No match_id in data');
+                    return;
+                }
+
+                console.log('Searching for match:', data.match_id);
+
+                for (const round of this.treeState.rounds) {
+                    for (const match of round.matches) {
+                        if (match.match_id === data.match_id) {
+                            console.log('Found match:', match);
+                            // Check if match has both songs ready
+                            if (match.song1 && match.song1.song_id && match.song2 && match.song2.song_id) {
+                                console.log('Opening match modal');
+                                this.openMatch(match);
+                            } else {
+                                console.log('Match not ready - missing songs');
+                            }
+                            return;
+                        }
+                    }
+                }
+                console.log('Match not found in tree state');
+            }
+
+            handleNavigateMatch(data) {
+                console.log('Received navigate_match message:', data);
+
+                if (!this.treeState || !data.match_id) return;
+
+                // Find the "from" match to show winner announcement
+                let fromMatch = null;
+                if (data.from_match_id) {
+                    for (const round of this.treeState.rounds) {
+                        for (const match of round.matches) {
+                            if (match.match_id === data.from_match_id) {
+                                fromMatch = match;
+                                break;
+                            }
+                        }
+                        if (fromMatch) break;
+                    }
+                }
+
+                // Find the target match by match_id
+                for (const round of this.treeState.rounds) {
+                    for (const match of round.matches) {
+                        if (match.match_id === data.match_id) {
+                            if (match.song1 && match.song1.song_id && match.song2 && match.song2.song_id) {
+                                // Show winner announcement if applicable, then open next match
+                                if (fromMatch && fromMatch.status === 'completed' && fromMatch.winner) {
+                                    this.showWinnerAnnouncement(fromMatch, () => {
+                                        this.openMatch(match);
+                                    });
+                                } else {
+                                    this.openMatch(match);
+                                }
+                            }
+                            return;
+                        }
+                    }
+                }
+            }
+
+            renderBracket() {
+                if (!this.treeState || !this.treeState.rounds) return;
+
+                const bracket = document.getElementById('tournament-bracket');
+                bracket.innerHTML = '';
+
+                // Create SVG for connection lines
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('class', 'bracket-connections');
+                svg.style.position = 'absolute';
+                svg.style.top = '0';
+                svg.style.left = '0';
+                svg.style.width = '100%';
+                svg.style.height = '100%';
+                svg.style.pointerEvents = 'none';
+                svg.style.zIndex = '0';
+
+                // Don't append SVG yet - add it after we know the bracket dimensions
+
+                // Store SVG reference for redrawing
+                this.svg = svg;
+                this.roundDivs = [];
+
+                this.treeState.rounds.forEach((round, roundIndex) => {
+                    const roundDiv = document.createElement('div');
+                    roundDiv.className = 'bracket-round';
+                    roundDiv.dataset.roundIndex = roundIndex;
+
+                    const roundTitle = document.createElement('h3');
+                    // Calculate round name from the end backwards
+                    const totalRounds = this.treeState.rounds.length;
+                    const roundsFromEnd = totalRounds - roundIndex;
+
+                    let roundName;
+                    if (roundsFromEnd === 1) {
+                        roundName = 'Final';
+                    } else if (roundsFromEnd === 2) {
+                        roundName = 'Semi Finals';
+                    } else if (roundsFromEnd === 3) {
+                        roundName = 'Quarter Finals';
+                    } else {
+                        roundName = `Round ${roundIndex + 1}`;
+                    }
+
+                    roundTitle.textContent = roundName;
+                    roundDiv.appendChild(roundTitle);
+
+                    round.matches.forEach((match, matchIndex) => {
+                        const matchDiv = this.createMatchElement(match);
+                        matchDiv.dataset.roundIndex = roundIndex;
+                        matchDiv.dataset.matchIndex = matchIndex;
+                        roundDiv.appendChild(matchDiv);
+                    });
+
+                    bracket.appendChild(roundDiv);
+                    this.roundDivs.push(roundDiv);
+                });
+
+                // Position matches after all are created
+                this.positionMatches();
+
+                // NOW append the SVG as the first child so it's behind everything
+                bracket.insertBefore(svg, bracket.firstChild);
+
+                // Draw connection lines after DOM is updated
+                setTimeout(() => {
+                    // Get the full bracket dimensions
+                    const width = bracket.scrollWidth;
+                    const height = bracket.scrollHeight;
+
+                    // Set explicit SVG size AND viewBox to match
+                    this.svg.style.width = width + 'px';
+                    this.svg.style.height = height + 'px';
+                    this.svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+                    this.svg.setAttribute('preserveAspectRatio', 'xMinYMin meet');
+
+                    this.drawBracketLines(this.svg, this.roundDivs);
+                }, 100);
+            }
+
+            positionMatches() {
+                // Position matches so each match is centered between its two parent matches
+                // First round uses default spacing
+                if (this.roundDivs.length === 0) return;
+
+                const baseSpacing = 20; // Base spacing between matches in first round
+
+                // Position first round with even spacing
+                const firstRound = this.roundDivs[0];
+                const firstMatches = firstRound.querySelectorAll('.bracket-match');
+                firstMatches.forEach((match, index) => {
+                    match.style.marginTop = baseSpacing + 'px';
+                    match.style.marginBottom = baseSpacing + 'px';
+                });
+
+                // For subsequent rounds, position each match at midpoint of parent matches
+                setTimeout(() => {
+                    for (let roundIndex = 1; roundIndex < this.roundDivs.length; roundIndex++) {
+                        const currentRound = this.roundDivs[roundIndex];
+                        const prevRound = this.roundDivs[roundIndex - 1];
+
+                        const currentMatches = currentRound.querySelectorAll('.bracket-match');
+                        const prevMatches = prevRound.querySelectorAll('.bracket-match');
+
+                        currentMatches.forEach((match, matchIndex) => {
+                            const parent1Index = matchIndex * 2;
+                            const parent2Index = matchIndex * 2 + 1;
+
+                            if (parent1Index < prevMatches.length && parent2Index < prevMatches.length) {
+                                const parent1 = prevMatches[parent1Index];
+                                const parent2 = prevMatches[parent2Index];
+
+                                // Get vertical centers of parent matches
+                                const parent1Rect = parent1.getBoundingClientRect();
+                                const parent2Rect = parent2.getBoundingClientRect();
+                                const roundRect = currentRound.getBoundingClientRect();
+
+                                const parent1Center = parent1Rect.top + parent1Rect.height / 2;
+                                const parent2Center = parent2Rect.top + parent2Rect.height / 2;
+                                const midpoint = (parent1Center + parent2Center) / 2;
+
+                                // Position current match at midpoint
+                                const currentTop = midpoint - roundRect.top - match.offsetHeight / 2;
+                                match.style.position = 'absolute';
+                                match.style.top = currentTop + 'px';
+                            }
+                        });
+                    }
+                }, 10);
+            }
+
+            drawBracketLines(svg, roundDivs) {
+                if (!svg || !roundDivs || roundDivs.length === 0) {
+                    return;
+                }
+
+                svg.innerHTML = ''; // Clear existing lines
+
+                // Draw lines connecting matches between rounds
+                for (let roundIndex = 0; roundIndex < roundDivs.length - 1; roundIndex++) {
+                    const currentRound = roundDivs[roundIndex];
+                    const nextRound = roundDivs[roundIndex + 1];
+
+                    const currentMatches = currentRound.querySelectorAll('.bracket-match');
+                    const nextMatches = nextRound.querySelectorAll('.bracket-match');
+
+                    // Each match in next round connects to 2 matches in current round
+                    nextMatches.forEach((nextMatch, nextMatchIndex) => {
+                        const match1Index = nextMatchIndex * 2;
+                        const match2Index = nextMatchIndex * 2 + 1;
+
+                        if (match1Index < currentMatches.length) {
+                            this.drawConnectionLine(svg, currentMatches[match1Index], nextMatch, 'top');
+                        }
+                        if (match2Index < currentMatches.length) {
+                            this.drawConnectionLine(svg, currentMatches[match2Index], nextMatch, 'bottom');
+                        }
+                    });
+                }
+            }
+
+            drawConnectionLine(svg, fromMatch, toMatch, position) {
+                const bracket = document.getElementById('tournament-bracket');
+                const bracketRect = bracket.getBoundingClientRect();
+                const fromRect = fromMatch.getBoundingClientRect();
+                const toRect = toMatch.getBoundingClientRect();
+
+                // Calculate positions relative to bracket container, including scroll offsets
+                const fromX = fromRect.right - bracketRect.left + bracket.scrollLeft;
+                const fromY = fromRect.top + fromRect.height / 2 - bracketRect.top + bracket.scrollTop;
+                const toX = toRect.left - bracketRect.left + bracket.scrollLeft;
+                const toY = toRect.top + toRect.height / 2 - bracketRect.top + bracket.scrollTop;
+
+                // Create path with horizontal then vertical segments
+                const midX = fromX + (toX - fromX) / 2;
+
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+
+                // Draw: horizontal from match -> vertical -> horizontal to next match
+                const pathData = `M ${fromX} ${fromY} L ${midX} ${fromY} L ${midX} ${toY} L ${toX} ${toY}`;
+                path.setAttribute('d', pathData);
+                path.setAttribute('fill', 'none');
+                path.setAttribute('stroke-linecap', 'round');
+                path.setAttribute('stroke-linejoin', 'round');
+
+                // Use Nord colors: default lines in subtle gray, winner paths in accent color
+                if (fromMatch.classList.contains('completed')) {
+                    path.setAttribute('stroke', '#88c0d0'); // Nord frost blue for winner paths
+                    path.setAttribute('stroke-width', '3');
+                } else {
+                    path.setAttribute('stroke', '#4c566a'); // Nord subtle gray for pending matches
+                    path.setAttribute('stroke-width', '2');
+                    path.setAttribute('opacity', '0.5');
+                }
+
+                svg.appendChild(path);
+            }
+
+            createMatchElement(match) {
+                const matchDiv = document.createElement('div');
+                matchDiv.className = 'bracket-match';
+                matchDiv.dataset.matchId = match.match_id;
+
+                if (match.status === 'completed') {
+                    matchDiv.classList.add('completed');
+                }
+                if (match.match_id === this.currentMatchId) {
+                    matchDiv.classList.add('active');
+                }
+
+                // Song 1
+                if (match.song1) {
+                    const song1Div = this.createSongElement(match.song1, match.winner && match.winner.song_id === match.song1.song_id);
+                    matchDiv.appendChild(song1Div);
+                }
+
+                // Song 2
+                if (match.song2) {
+                    const song2Div = this.createSongElement(match.song2, match.winner && match.winner.song_id === match.song2.song_id);
+                    matchDiv.appendChild(song2Div);
+                }
+
+                // Click to open match (if it's the current match or completed)
+                if (match.song1 && match.song1.song_id && match.song2 && match.song2.song_id) {
+                    matchDiv.addEventListener('click', () => {
+                        this.openMatch(match);
+                    });
+                }
+
+                return matchDiv;
+            }
+
+            createSongElement(song, isWinner) {
+                const songDiv = document.createElement('div');
+                songDiv.className = 'match-song';
+                if (isWinner) {
+                    songDiv.classList.add('winner');
+                }
+
+                if (song.song_id) {
+                    const img = document.createElement('img');
+                    img.src = song.thumbnail_url || '/static/images/default-thumbnail.png';
+                    img.alt = song.song_title;
+                    songDiv.appendChild(img);
+
+                    const infoDiv = document.createElement('div');
+                    infoDiv.className = 'match-song-info';
+
+                    const title = document.createElement('div');
+                    title.className = 'match-song-title';
+                    // Show English title in parentheses if both titles exist and are different
+                    if (song.song_title_english && song.song_title_english !== song.song_title) {
+                        title.textContent = `${song.song_title} (${song.song_title_english})`;
+                    } else {
+                        title.textContent = song.song_title;
+                    }
+                    infoDiv.appendChild(title);
+
+                    const artist = document.createElement('div');
+                    artist.className = 'match-song-artist';
+                    artist.textContent = song.artists;
+                    infoDiv.appendChild(artist);
+
+                    // Add category and cover info
+                    const metaDiv = document.createElement('div');
+                    metaDiv.className = 'match-song-meta';
+
+                    const metaParts = [];
+                    if (song.category_name) {
+                        metaParts.push(song.category_name);
+                    }
+                    if (song.is_cover) {
+                        metaParts.push('Cover');
+                    }
+
+                    if (metaParts.length > 0) {
+                        metaDiv.textContent = metaParts.join(' • ');
+                        infoDiv.appendChild(metaDiv);
+                    }
+
+                    songDiv.appendChild(infoDiv);
+                } else {
+                    const placeholder = document.createElement('div');
+                    placeholder.className = 'match-song-info';
+                    placeholder.textContent = song.song_title || 'TBD';
+                    songDiv.appendChild(placeholder);
+                }
+
+                return songDiv;
+            }
+
+            openMatch(match) {
+                this.currentMatch = match;
+                this.myPick = null;
+
+                // Hide warning message when opening new match
+                document.getElementById('next-match-warning').style.display = 'none';
+
+                // Find which round this match is in
+                let roundName = 'Match';
+                if (this.treeState && this.treeState.rounds) {
+                    const totalRounds = this.treeState.rounds.length;
+                    for (let roundIndex = 0; roundIndex < totalRounds; roundIndex++) {
+                        const round = this.treeState.rounds[roundIndex];
+                        if (round.matches.some(m => m.match_id === match.match_id)) {
+                            const roundsFromEnd = totalRounds - roundIndex;
+                            if (roundsFromEnd === 1) {
+                                roundName = 'Match - Final';
+                            } else if (roundsFromEnd === 2) {
+                                roundName = 'Match - Semi Finals';
+                            } else if (roundsFromEnd === 3) {
+                                roundName = 'Match - Quarter Finals';
+                            } else {
+                                roundName = `Match - Round ${roundIndex + 1}`;
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                // Set match title with round
+                document.getElementById('match-title').textContent = roundName;
+
+                // Set song info with English titles in parentheses if available
+                const song1Title = match.song1.song_title_english && match.song1.song_title_english !== match.song1.song_title
+                    ? `${match.song1.song_title} (${match.song1.song_title_english})`
+                    : match.song1.song_title;
+                const song2Title = match.song2.song_title_english && match.song2.song_title_english !== match.song2.song_title
+                    ? `${match.song2.song_title} (${match.song2.song_title_english})`
+                    : match.song2.song_title;
+
+                document.getElementById('song-title-1').textContent = song1Title;
+                document.getElementById('song-artist-1').textContent = match.song1.artists;
+                document.getElementById('song-title-2').textContent = song2Title;
+                document.getElementById('song-artist-2').textContent = match.song2.artists;
+
+                // Initialize video players
+                this.initMatchVideos(match);
+
+                // Show modal
+                document.getElementById('match-modal').classList.add('active');
+
+                // Update pick status
+                this.updatePickStatus(match);
+            }
+
+            initMatchVideos(match) {
+                // Clean up existing players
+                if (this.player1) {
+                    this.player1.destroy();
+                    this.player1 = null;
+                }
+                if (this.player2) {
+                    this.player2.destroy();
+                    this.player2 = null;
+                }
+
+                // Clear video containers
+                document.getElementById('video-container-1').innerHTML = '<div id="video-player-1"></div>';
+                document.getElementById('video-container-2').innerHTML = '<div id="video-player-2"></div>';
+
+                // Extract video IDs
+                const videoId1 = this.extractYouTubeId(match.song1.embed_url);
+                const videoId2 = this.extractYouTubeId(match.song2.embed_url);
+
+                // Initialize players when YouTube API is ready
+                if (videoId1) {
+                    this.initYouTubePlayer(1, videoId1);
+                }
+                if (videoId2) {
+                    this.initYouTubePlayer(2, videoId2);
+                }
+            }
+
+            extractYouTubeId(url) {
+                if (!url) return null;
+                const match = url.match(/embed\/([^?]+)/);
+                return match ? match[1] : null;
+            }
+
+            initYouTubePlayer(playerNum, videoId) {
+                // Wait for YouTube API to be ready
+                if (typeof YT === 'undefined' || !YT.Player) {
+                    setTimeout(() => this.initYouTubePlayer(playerNum, videoId), 100);
+                    return;
+                }
+
+                const player = new YT.Player(`video-player-${playerNum}`, {
+                    videoId: videoId,
+                    playerVars: {
+                        autoplay: 0,
+                        controls: 1,
+                        modestbranding: 1,
+                        rel: 0
+                    },
+                    events: {
+                        onReady: (event) => {
+                            console.log(`Player ${playerNum} ready`);
+                        },
+                        onStateChange: (event) => {
+                            if (this.videoSyncEnabled) {
+                                this.onPlayerStateChange(playerNum, event);
+                            }
+                        }
+                    }
+                });
+
+                if (playerNum === 1) {
+                    this.player1 = player;
+                } else {
+                    this.player2 = player;
+                }
+            }
+
+            onPlayerStateChange(playerNum, event) {
+                // Broadcast video state if sync is enabled
+                if (!this.videoSyncEnabled) return;
+
+                const player = playerNum === 1 ? this.player1 : this.player2;
+                if (!player) return;
+
+                const time = player.getCurrentTime();
+                const isPlaying = event.data === YT.PlayerState.PLAYING;
+
+                // Only broadcast on actual play/pause
+                if (event.data === YT.PlayerState.PLAYING || event.data === YT.PlayerState.PAUSED) {
+                    this.sendMessage('video_sync', {
+                        player_num: playerNum,
+                        time: time,
+                        is_playing: isPlaying
+                    });
+                }
+            }
+
+            pickWinner(songNumber) {
+                if (!this.currentMatch) return;
+
+                const songId = songNumber === 1 ? this.currentMatch.song1.song_id : this.currentMatch.song2.song_id;
+                this.myPick = songId;
+
+                // Highlight picked competitor
+                document.getElementById('competitor-1').classList.toggle('picked', songNumber === 1);
+                document.getElementById('competitor-2').classList.toggle('picked', songNumber === 2);
+
+                // Optimistically update the UI by adding our pick to the current match
+                const currentUserId = this.getCurrentUserId();
+                const currentUsername = '{{.username}}';
+
+                // Remove any existing pick from this user
+                if (!this.currentMatch.user_picks) {
+                    this.currentMatch.user_picks = [];
+                }
+                this.currentMatch.user_picks = this.currentMatch.user_picks.filter(p => p.user_id !== currentUserId);
+
+                // Add the new pick
+                this.currentMatch.user_picks.push({
+                    user_id: currentUserId,
+                    username: currentUsername,
+                    picked_song_id: songId,
+                    picked_at: new Date().toISOString()
+                });
+
+                // Update the pick status display immediately
+                this.updatePickStatus(this.currentMatch);
+
+                // Send pick to server
+                this.sendMessage('pick_winner', {
+                    match_id: this.currentMatch.match_id,
+                    song_id: songId
+                });
+            }
+
+            goToNextMatch() {
+                if (!this.currentMatch || !this.treeState) return;
+
+                // Check if all users have picked
+                const picksCount = this.currentMatch.user_picks ? this.currentMatch.user_picks.length : 0;
+                const allPicked = picksCount >= this.currentUsers.length;
+
+                if (!allPicked) {
+                    // Show warning
+                    const warning = document.getElementById('next-match-warning');
+                    if (warning.style.display === 'none') {
+                        warning.style.display = 'block';
+                        return; // Don't proceed yet, just show warning
+                    }
+                    // If warning is already visible, user confirmed - proceed
+                }
+
+                // Check if this is the final match (last round, no next match available)
+                const isFinalMatch = this.isFinalMatch();
+
+                if (isFinalMatch) {
+                    // For the final match, just show the winner announcement and keep it displayed
+                    if (this.currentMatch.status === 'completed' && this.currentMatch.winner) {
+                        this.showWinnerAnnouncement(this.currentMatch, null, true); // permanent = true
+                    }
+                } else {
+                    // Broadcast navigation immediately to all clients
+                    this.proceedToNextMatch(true); // true = send message to all clients
+                }
+            }
+
+            isFinalMatch() {
+                if (!this.currentMatch || !this.treeState) return false;
+
+                // Find current match position
+                let currentRoundIndex = -1;
+                let currentMatchIndex = -1;
+
+                for (let rIdx = 0; rIdx < this.treeState.rounds.length; rIdx++) {
+                    const round = this.treeState.rounds[rIdx];
+                    for (let mIdx = 0; mIdx < round.matches.length; mIdx++) {
+                        if (round.matches[mIdx].match_id === this.currentMatch.match_id) {
+                            currentRoundIndex = rIdx;
+                            currentMatchIndex = mIdx;
+                            break;
+                        }
+                    }
+                    if (currentRoundIndex !== -1) break;
+                }
+
+                if (currentRoundIndex === -1) return false;
+
+                // Check if there's a next match
+                const hasNextInRound = currentMatchIndex + 1 < this.treeState.rounds[currentRoundIndex].matches.length;
+                const hasNextRound = currentRoundIndex + 1 < this.treeState.rounds.length;
+
+                return !hasNextInRound && !hasNextRound;
+            }
+
+            showWinnerAnnouncement(match, callback, permanent = false) {
+                const announcement = document.getElementById('winner-announcement');
+                const songTitle = document.getElementById('winner-song-title');
+                const reasonText = document.getElementById('winner-reason');
+
+                const winner = match.winner;
+                // Show English title in parentheses if both titles exist and are different
+                if (winner.song_title_english && winner.song_title_english !== winner.song_title) {
+                    songTitle.textContent = `${winner.song_title} (${winner.song_title_english})`;
+                } else {
+                    songTitle.textContent = winner.song_title;
+                }
+
+                // Determine why this song won
+                const reason = this.determineWinReason(match);
+                reasonText.textContent = reason;
+
+                announcement.style.display = 'block';
+
+                if (permanent) {
+                    // For final match, keep the announcement displayed
+                    // Don't hide it or call callback
+                } else {
+                    // Hide after 3 seconds and proceed
+                    setTimeout(() => {
+                        announcement.style.display = 'none';
+                        callback();
+                    }, 3000);
+                }
+            }
+
+            determineWinReason(match) {
+                // Count picks for each song
+                let song1Picks = 0;
+                let song2Picks = 0;
+
+                if (match.user_picks) {
+                    match.user_picks.forEach(pick => {
+                        if (pick.picked_song_id === match.song1.song_id) {
+                            song1Picks++;
+                        } else if (pick.picked_song_id === match.song2.song_id) {
+                            song2Picks++;
+                        }
+                    });
+                }
+
+                const winnerSongId = match.winner.song_id;
+                const winnerPicks = winnerSongId === match.song1.song_id ? song1Picks : song2Picks;
+                const loserPicks = winnerSongId === match.song1.song_id ? song2Picks : song1Picks;
+
+                if (winnerPicks > loserPicks) {
+                    return `Won by popular vote: ${winnerPicks} picks vs ${loserPicks} picks`;
+                } else if (winnerPicks === loserPicks) {
+                    // Tied on picks, check ratings
+                    const winnerRating = match.winner.average_rating;
+                    const loserRating = winnerSongId === match.song1.song_id
+                        ? match.song2.average_rating
+                        : match.song1.average_rating;
+
+                    if (winnerRating !== loserRating) {
+                        return `Tied on picks (${winnerPicks}-${loserPicks}), won by rating: ${winnerRating.toFixed(2)} vs ${loserRating.toFixed(2)}`;
+                    } else {
+                        return `Tied on picks (${winnerPicks}-${loserPicks}) and rating (${winnerRating.toFixed(2)}), won by coin toss`;
+                    }
+                }
+
+                return 'Winner determined';
+            }
+
+            proceedToNextMatch(shouldBroadcast = false) {
+                // Find current match position
+                let currentRoundIndex = -1;
+                let currentMatchIndex = -1;
+
+                for (let rIdx = 0; rIdx < this.treeState.rounds.length; rIdx++) {
+                    const round = this.treeState.rounds[rIdx];
+                    for (let mIdx = 0; mIdx < round.matches.length; mIdx++) {
+                        if (round.matches[mIdx].match_id === this.currentMatch.match_id) {
+                            currentRoundIndex = rIdx;
+                            currentMatchIndex = mIdx;
+                            break;
+                        }
+                    }
+                    if (currentRoundIndex !== -1) break;
+                }
+
+                if (currentRoundIndex === -1) return; // Current match not found
+
+                // Find next match
+                let nextMatch = null;
+
+                // Try next match in same round
+                if (currentMatchIndex + 1 < this.treeState.rounds[currentRoundIndex].matches.length) {
+                    nextMatch = this.treeState.rounds[currentRoundIndex].matches[currentMatchIndex + 1];
+                }
+                // Try first match of next round
+                else if (currentRoundIndex + 1 < this.treeState.rounds.length) {
+                    nextMatch = this.treeState.rounds[currentRoundIndex + 1].matches[0];
+                }
+
+                if (nextMatch && nextMatch.song1 && nextMatch.song1.song_id && nextMatch.song2 && nextMatch.song2.song_id) {
+                    // Hide warning
+                    document.getElementById('next-match-warning').style.display = 'none';
+
+                    // Broadcast to all clients BEFORE showing winner announcement
+                    if (shouldBroadcast) {
+                        this.sendMessage('navigate_match', {
+                            match_id: nextMatch.match_id,
+                            from_match_id: this.currentMatch.match_id
+                        });
+                    }
+
+                    // Show winner announcement if applicable, then open next match
+                    if (this.currentMatch.status === 'completed' && this.currentMatch.winner) {
+                        this.showWinnerAnnouncement(this.currentMatch, () => {
+                            this.openMatch(nextMatch);
+                        });
+                    } else {
+                        this.openMatch(nextMatch);
+                    }
+                } else {
+                    alert('No more matches available. Tournament may be complete or waiting for previous matches to finish.');
+                }
+            }
+
+            updatePickStatus(match) {
+                const picksDiv = document.getElementById('users-picks');
+                picksDiv.innerHTML = '';
+
+                if (match.user_picks) {
+                    match.user_picks.forEach(pick => {
+                        const badge = document.createElement('span');
+                        badge.className = 'user-pick-badge';
+
+                        // Determine which song was picked
+                        let songName = 'unknown';
+                        let songEnglishName = null;
+                        if (pick.picked_song_id) {
+                            if (match.song1 && match.song1.song_id === pick.picked_song_id) {
+                                songName = match.song1.song_title;
+                                songEnglishName = match.song1.song_title_english;
+                            } else if (match.song2 && match.song2.song_id === pick.picked_song_id) {
+                                songName = match.song2.song_title;
+                                songEnglishName = match.song2.song_title_english;
+                            }
+                        }
+
+                        // Add English title in parentheses if available and different
+                        let displayName = songName;
+                        if (songEnglishName && songEnglishName !== songName) {
+                            displayName = `${songName} (${songEnglishName})`;
+                        }
+
+                        badge.textContent = `${pick.username} → ${displayName}`;
+                        badge.title = `${pick.username} picked ${displayName}`;
+                        picksDiv.appendChild(badge);
+                    });
+                }
+
+                const statusText = document.getElementById('pick-status');
+                const picksCount = match.user_picks ? match.user_picks.length : 0;
+                statusText.textContent = `${picksCount} / ${this.currentUsers.length} users have picked`;
+            }
+
+            sendMessage(type, data) {
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.send(JSON.stringify({
+                        type: type,
+                        data: data,
+                        timestamp: new Date().toISOString()
+                    }));
+                }
+            }
+
+            getCurrentUserId() {
+                return '{{.user_id}}';
+            }
+        }
+
+        // Initialize tournament room
+        document.addEventListener('DOMContentLoaded', () => {
+            const roomId = '{{.room_id}}';
+            window.tournamentRoom = new TournamentRoom(roomId);
+        });
+    </script>
+</body>
+</html>
+{{end}}
