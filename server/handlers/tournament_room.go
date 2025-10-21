@@ -561,12 +561,16 @@ func sendTournamentState(db *gorm.DB, roomID string, conn *websocket.Conn) {
 		return
 	}
 
+	// Load existing votes for all tournament songs
+	existingVotes := loadExistingVotesForTournament(db, &room.TreeState)
+
 	// Send tournament state
 	stateData, _ := json.Marshal(map[string]interface{}{
 		"tree_state":         room.TreeState,
 		"status":             room.Status,
 		"current_match_id":   room.CurrentMatchID,
 		"video_sync_enabled": room.VideoSyncEnabled,
+		"existing_votes":     existingVotes,
 	})
 
 	message := wsocket.WSMessage{
@@ -815,11 +819,15 @@ func broadcastTournamentState(db *gorm.DB, roomID string) {
 		return
 	}
 
+	// Load existing votes for all tournament songs
+	existingVotes := loadExistingVotesForTournament(db, &room.TreeState)
+
 	stateData, _ := json.Marshal(map[string]interface{}{
 		"tree_state":         room.TreeState,
 		"status":             room.Status,
 		"current_match_id":   room.CurrentMatchID,
 		"video_sync_enabled": room.VideoSyncEnabled,
+		"existing_votes":     existingVotes,
 	})
 
 	message := wsocket.WSMessage{
@@ -864,4 +872,68 @@ func broadcastTournamentUserUpdate(roomID string) {
 	}
 
 	tournamentRoomManager.BroadcastToRoom(roomID, message)
+}
+
+// loadExistingVotesForTournament loads existing votes for all songs in the tournament
+func loadExistingVotesForTournament(db *gorm.DB, treeState *models.TreeState) map[uint][]wsocket.VoteUpdateData {
+	if treeState == nil {
+		return make(map[uint][]wsocket.VoteUpdateData)
+	}
+
+	result := make(map[uint][]wsocket.VoteUpdateData)
+
+	// Collect all unique song IDs from all matches
+	songIDsMap := make(map[uint]bool)
+	for _, round := range treeState.Rounds {
+		for _, match := range round.Matches {
+			if match.Song1 != nil && match.Song1.SongID != nil {
+				songIDsMap[*match.Song1.SongID] = true
+			}
+			if match.Song2 != nil && match.Song2.SongID != nil {
+				songIDsMap[*match.Song2.SongID] = true
+			}
+		}
+	}
+
+	// Convert map keys to slice
+	songIDs := make([]uint, 0, len(songIDsMap))
+	for songID := range songIDsMap {
+		songIDs = append(songIDs, songID)
+	}
+
+	if len(songIDs) == 0 {
+		return result
+	}
+
+	// Load all votes for these songs
+	var votes []models.Vote
+	db.Where("song_id IN ?", songIDs).Find(&votes)
+
+	// Get usernames for the votes
+	userIDs := make([]uint, 0, len(votes))
+	for _, vote := range votes {
+		userIDs = append(userIDs, vote.UserID)
+	}
+
+	usernames := make(map[uint]string)
+	if len(userIDs) > 0 {
+		var users []models.User
+		db.Where("user_id IN ?", userIDs).Find(&users)
+		for _, user := range users {
+			usernames[user.UserID] = user.Username
+		}
+	}
+
+	// Group votes by song ID
+	for _, vote := range votes {
+		voteData := wsocket.VoteUpdateData{
+			UserID:   fmt.Sprintf("%d", vote.UserID),
+			Username: usernames[vote.UserID],
+			Rating:   vote.Rating,
+			Comment:  vote.Comment,
+		}
+		result[vote.SongID] = append(result[vote.SongID], voteData)
+	}
+
+	return result
 }

@@ -179,6 +179,30 @@
             background: var(--bg-primary);
             border-radius: 4px;
         }
+        .vote-spoiler {
+            width: 100%;
+        }
+        .spoiler-header {
+            padding: 12px;
+            background: var(--bg-accent);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+            font-size: 14px;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .spoiler-header:hover {
+            background: var(--accent-primary);
+            color: var(--text-primary);
+            border-color: var(--accent-primary);
+        }
+        .spoiler-content {
+            margin-top: 10px;
+            padding-top: 10px;
+        }
         .competitor-pick {
             margin-top: 15px;
         }
@@ -309,20 +333,28 @@
                                 <p id="song-artist-1">Artist</p>
                             </div>
                             <div class="competitor-vote">
-                                <label for="rating-1">Your Rating:</label>
-                                <select id="rating-1" class="form-select">
-                                    <option value="">Not rated</option>
-                                    <option value="1">1 - Terrible</option>
-                                    <option value="2">2 - Poor</option>
-                                    <option value="3">3 - Below Average</option>
-                                    <option value="4">4 - Fair</option>
-                                    <option value="5">5 - Average</option>
-                                    <option value="6">6 - Above Average</option>
-                                    <option value="7">7 - Good</option>
-                                    <option value="8">8 - Very Good</option>
-                                    <option value="9">9 - Excellent</option>
-                                    <option value="10">10 - Perfect</option>
-                                </select>
+                                <div class="vote-spoiler" id="vote-spoiler-1">
+                                    <div class="spoiler-header">
+                                        Click to show/hide rating form
+                                    </div>
+                                    <div class="spoiler-content" id="spoiler-content-1" style="display: none;">
+                                        <label for="rating-1">Your Rating:</label>
+                                        <select id="rating-1" class="form-select">
+                                            <option value="">Not rated</option>
+                                            <option value="1">1 - Terrible</option>
+                                            <option value="2">2 - Poor</option>
+                                            <option value="3">3 - Below Average</option>
+                                            <option value="4">4 - Fair</option>
+                                            <option value="5">5 - Average</option>
+                                            <option value="6">6 - Above Average</option>
+                                            <option value="7">7 - Good</option>
+                                            <option value="8">8 - Very Good</option>
+                                            <option value="9">9 - Excellent</option>
+                                            <option value="10">10 - Perfect</option>
+                                        </select>
+                                        <button id="vote-btn-1" class="btn-secondary" style="margin-top: 10px; width: 100%;">Submit Vote</button>
+                                    </div>
+                                </div>
                             </div>
                             <div class="competitor-pick">
                                 <button id="pick-btn-1" class="btn-primary" style="width: 100%;">Pick This Song</button>
@@ -339,20 +371,28 @@
                                 <p id="song-artist-2">Artist</p>
                             </div>
                             <div class="competitor-vote">
-                                <label for="rating-2">Your Rating:</label>
-                                <select id="rating-2" class="form-select">
-                                    <option value="">Not rated</option>
-                                    <option value="1">1 - Terrible</option>
-                                    <option value="2">2 - Poor</option>
-                                    <option value="3">3 - Below Average</option>
-                                    <option value="4">4 - Fair</option>
-                                    <option value="5">5 - Average</option>
-                                    <option value="6">6 - Above Average</option>
-                                    <option value="7">7 - Good</option>
-                                    <option value="8">8 - Very Good</option>
-                                    <option value="9">9 - Excellent</option>
-                                    <option value="10">10 - Perfect</option>
-                                </select>
+                                <div class="vote-spoiler" id="vote-spoiler-2">
+                                    <div class="spoiler-header">
+                                        Click to show/hide rating form
+                                    </div>
+                                    <div class="spoiler-content" id="spoiler-content-2" style="display: none;">
+                                        <label for="rating-2">Your Rating:</label>
+                                        <select id="rating-2" class="form-select">
+                                            <option value="">Not rated</option>
+                                            <option value="1">1 - Terrible</option>
+                                            <option value="2">2 - Poor</option>
+                                            <option value="3">3 - Below Average</option>
+                                            <option value="4">4 - Fair</option>
+                                            <option value="5">5 - Average</option>
+                                            <option value="6">6 - Above Average</option>
+                                            <option value="7">7 - Good</option>
+                                            <option value="8">8 - Very Good</option>
+                                            <option value="9">9 - Excellent</option>
+                                            <option value="10">10 - Perfect</option>
+                                        </select>
+                                        <button id="vote-btn-2" class="btn-secondary" style="margin-top: 10px; width: 100%;">Submit Vote</button>
+                                    </div>
+                                </div>
                             </div>
                             <div class="competitor-pick">
                                 <button id="pick-btn-2" class="btn-primary" style="width: 100%;">Pick This Song</button>
@@ -387,6 +427,7 @@
                 this.svg = null;
                 this.roundDivs = [];
                 this.shouldAutoOpenFirstMatch = false;
+                this.existingVotes = {}; // Map of song_id to array of vote data
 
                 this.initWebSocket();
                 this.initEventListeners();
@@ -439,31 +480,133 @@
                     this.pickWinner(2);
                 });
 
-                // Rating change handlers
-                document.getElementById('rating-1').addEventListener('change', (e) => {
-                    this.submitRating(1, e.target.value);
+                // Vote button handlers
+                document.getElementById('vote-btn-1').addEventListener('click', () => {
+                    this.submitVote(1);
                 });
 
-                document.getElementById('rating-2').addEventListener('change', (e) => {
-                    this.submitRating(2, e.target.value);
+                document.getElementById('vote-btn-2').addEventListener('click', () => {
+                    this.submitVote(2);
+                });
+
+                // Spoiler toggle handlers
+                document.getElementById('vote-spoiler-1').querySelector('.spoiler-header').addEventListener('click', () => {
+                    this.toggleSpoiler(1);
+                });
+
+                document.getElementById('vote-spoiler-2').querySelector('.spoiler-header').addEventListener('click', () => {
+                    this.toggleSpoiler(2);
                 });
             }
 
-            submitRating(songNumber, rating) {
-                if (!this.currentMatch || !rating) return;
+            toggleSpoiler(songNumber) {
+                const spoilerContent = document.getElementById(`spoiler-content-${songNumber}`);
+                if (spoilerContent.style.display === 'none') {
+                    spoilerContent.style.display = 'block';
+                } else {
+                    spoilerContent.style.display = 'none';
+                }
+            }
+
+            async submitVote(songNumber) {
+                if (!this.currentMatch) return;
 
                 const song = songNumber === 1 ? this.currentMatch.song1 : this.currentMatch.song2;
-                if (!song || !song.song_id) return;
+                const ratingSelect = document.getElementById(`rating-${songNumber}`);
+                const rating = ratingSelect.value;
 
-                const voteData = {
-                    user_id: this.getCurrentUserId(),
-                    username: '{{.username}}',
-                    song_id: song.song_id,
-                    rating: parseInt(rating),
-                    comment: ''
-                };
+                if (!song || !song.song_id) {
+                    alert('Invalid song');
+                    return;
+                }
 
-                this.sendMessage('vote_update', voteData);
+                if (!rating) {
+                    alert('Please select a rating');
+                    return;
+                }
+
+                const voteButton = document.getElementById(`vote-btn-${songNumber}`);
+                voteButton.disabled = true;
+                voteButton.textContent = 'Submitting...';
+
+                try {
+                    // Submit vote to the database via POST request
+                    const response = await fetch(`/songs/${song.song_id}/vote`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: `rating=${rating}&comment=`
+                    });
+
+                    if (response.ok) {
+                        // Update button to show success
+                        voteButton.textContent = 'Vote Submitted!';
+                        setTimeout(() => {
+                            voteButton.textContent = 'Submit Vote';
+                            voteButton.disabled = false;
+                        }, 2000);
+
+                        // Broadcast vote update to other users in the room
+                        const voteData = {
+                            user_id: this.getCurrentUserId(),
+                            username: '{{.username}}',
+                            song_id: song.song_id,
+                            rating: parseInt(rating),
+                            comment: ''
+                        };
+                        this.sendMessage('vote_update', voteData);
+
+                        // Update local existingVotes cache
+                        if (!this.existingVotes[song.song_id]) {
+                            this.existingVotes[song.song_id] = [];
+                        }
+                        // Remove old vote from this user if exists
+                        this.existingVotes[song.song_id] = this.existingVotes[song.song_id].filter(
+                            v => v.user_id !== this.getCurrentUserId()
+                        );
+                        // Add new vote
+                        this.existingVotes[song.song_id].push(voteData);
+                    } else {
+                        const errorText = await response.text();
+                        alert(`Failed to submit vote: ${errorText}`);
+                        voteButton.textContent = 'Submit Vote';
+                        voteButton.disabled = false;
+                    }
+                } catch (error) {
+                    console.error('Error submitting vote:', error);
+                    alert('Failed to submit vote. Please try again.');
+                    voteButton.textContent = 'Submit Vote';
+                    voteButton.disabled = false;
+                }
+            }
+
+            populateExistingVotes(match) {
+                if (!match || !this.existingVotes) return;
+
+                // Reset rating dropdowns to default
+                document.getElementById('rating-1').value = '';
+                document.getElementById('rating-2').value = '';
+
+                const currentUserId = this.getCurrentUserId();
+
+                // Populate rating for song 1
+                if (match.song1 && match.song1.song_id && this.existingVotes[match.song1.song_id]) {
+                    const votes = this.existingVotes[match.song1.song_id];
+                    const userVote = votes.find(vote => vote.user_id === currentUserId);
+                    if (userVote) {
+                        document.getElementById('rating-1').value = userVote.rating;
+                    }
+                }
+
+                // Populate rating for song 2
+                if (match.song2 && match.song2.song_id && this.existingVotes[match.song2.song_id]) {
+                    const votes = this.existingVotes[match.song2.song_id];
+                    const userVote = votes.find(vote => vote.user_id === currentUserId);
+                    if (userVote) {
+                        document.getElementById('rating-2').value = userVote.rating;
+                    }
+                }
             }
 
             handleMessage(message) {
@@ -524,6 +667,7 @@
                 this.status = data.status;
                 this.currentMatchId = data.current_match_id;
                 this.videoSyncEnabled = data.video_sync_enabled;
+                this.existingVotes = data.existing_votes || {};
 
                 this.renderBracket();
 
@@ -542,6 +686,8 @@
                                 this.currentMatch = match;
                                 // Update the pick status display
                                 this.updatePickStatus(match);
+                                // Update existing votes if modal is open
+                                this.populateExistingVotes(match);
                                 break;
                             }
                         }
@@ -999,6 +1145,9 @@
 
                 // Initialize video players
                 this.initMatchVideos(match);
+
+                // Populate existing votes for both songs
+                this.populateExistingVotes(match);
 
                 // Show modal
                 document.getElementById('match-modal').classList.add('active');
