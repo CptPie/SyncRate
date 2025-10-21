@@ -714,8 +714,16 @@ func handlePickWinner(db *gorm.DB, roomID string, userID string, data json.RawMe
 
 	// Check if all users have picked
 	if len(match.UserPicks) >= totalUsers {
-		// Determine winner
-		winner := determineMatchWinner(match)
+		// Update average ratings with current values from database before determining winner
+		if match.Song1 != nil && match.Song1.SongID != nil {
+			match.Song1.AverageRating = getAverageSongRatingFromDB(db, *match.Song1.SongID)
+		}
+		if match.Song2 != nil && match.Song2.SongID != nil {
+			match.Song2.AverageRating = getAverageSongRatingFromDB(db, *match.Song2.SongID)
+		}
+
+		// Determine winner (pass db to recalculate ratings)
+		winner := determineMatchWinner(db, match)
 		match.Winner = winner
 		match.Status = "completed"
 		now := time.Now()
@@ -748,7 +756,7 @@ func findMatchInTree(tree *models.TreeState, matchID string) *models.Match {
 	return nil
 }
 
-func determineMatchWinner(match *models.Match) *models.MatchSong {
+func determineMatchWinner(db *gorm.DB, match *models.Match) *models.MatchSong {
 	// Count picks for each song
 	song1Picks := 0
 	song2Picks := 0
@@ -770,10 +778,18 @@ func determineMatchWinner(match *models.Match) *models.MatchSong {
 		return match.Song2
 	}
 
-	// Tie: use average rating
-	if match.Song1.AverageRating > match.Song2.AverageRating {
+	// Tie: recalculate average ratings from database to get latest votes
+	var currentRating1, currentRating2 float64
+	if match.Song1 != nil && match.Song1.SongID != nil {
+		currentRating1 = getAverageSongRatingFromDB(db, *match.Song1.SongID)
+	}
+	if match.Song2 != nil && match.Song2.SongID != nil {
+		currentRating2 = getAverageSongRatingFromDB(db, *match.Song2.SongID)
+	}
+
+	if currentRating1 > currentRating2 {
 		return match.Song1
-	} else if match.Song2.AverageRating > match.Song1.AverageRating {
+	} else if currentRating2 > currentRating1 {
 		return match.Song2
 	}
 
