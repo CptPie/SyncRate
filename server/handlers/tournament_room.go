@@ -713,6 +713,7 @@ func handlePickWinner(db *gorm.DB, roomID string, userID string, data json.RawMe
 	}
 
 	// Check if all users have picked
+	matchCompleted := false
 	if len(match.UserPicks) >= totalUsers {
 		// Update average ratings with current values from database before determining winner
 		if match.Song1 != nil && match.Song1.SongID != nil {
@@ -728,18 +729,30 @@ func handlePickWinner(db *gorm.DB, roomID string, userID string, data json.RawMe
 		match.Status = "completed"
 		now := time.Now()
 		match.CompletedAt = &now
+		matchCompleted = true
 
 		// Advance winner to next round if applicable
 		advanceWinner(&room.TreeState, pickData.MatchID, winner)
 	}
 
-	// Save updated tree state
+	// Prepare update map
+	updates := map[string]interface{}{
+		"tree_state":  room.TreeState,
+		"last_active": time.Now(),
+	}
+
+	// If match completed, find and set next active match as current
+	if matchCompleted {
+		nextMatchID := findNextActiveMatch(&room.TreeState)
+		if nextMatchID != "" {
+			updates["current_match_id"] = nextMatchID
+		}
+	}
+
+	// Save updated tree state and current match
 	db.Model(&models.TournamentRoom{}).
 		Where("room_id = ?", roomID).
-		Updates(map[string]interface{}{
-			"tree_state":  room.TreeState,
-			"last_active": time.Now(),
-		})
+		Updates(updates)
 
 	// Broadcast updated state
 	broadcastTournamentState(db, roomID)
@@ -754,6 +767,27 @@ func findMatchInTree(tree *models.TreeState, matchID string) *models.Match {
 		}
 	}
 	return nil
+}
+
+// findNextActiveMatch finds the next match that can be played (has both songs and isn't completed)
+func findNextActiveMatch(tree *models.TreeState) string {
+	if tree == nil || tree.Rounds == nil {
+		return ""
+	}
+
+	// Iterate through rounds from first to last
+	for _, round := range tree.Rounds {
+		for _, match := range round.Matches {
+			// Check if match has both songs assigned and isn't completed
+			if match.Song1 != nil && match.Song1.SongID != nil &&
+				match.Song2 != nil && match.Song2.SongID != nil &&
+				match.Status != "completed" {
+				return match.MatchID
+			}
+		}
+	}
+
+	return "" // No active matches found (tournament is over)
 }
 
 func determineMatchWinner(db *gorm.DB, match *models.Match) *models.MatchSong {

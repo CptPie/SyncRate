@@ -12,10 +12,60 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
+            padding: 15px;
+            background: var(--bg-primary);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        .tournament-header h2 {
+            margin: 0;
+            color: var(--accent-primary);
+        }
+        .tournament-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
         }
         .tournament-controls button {
-            margin-left: 10px;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
         }
+        .tournament-controls button:hover {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+            color: var(--text-primary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Responsive design for smaller screens */
+        @media (max-width: 768px) {
+            .tournament-header {
+                flex-direction: column;
+                gap: 15px;
+                align-items: stretch;
+            }
+            .tournament-header h2 {
+                text-align: center;
+            }
+            .tournament-controls {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            .tournament-controls button {
+                flex: 1;
+                min-width: 120px;
+            }
+        }
+
         .tournament-bracket {
             position: relative;
             display: flex;
@@ -279,6 +329,7 @@
                     <h2>Tournament: {{.room_id}}</h2>
                     <div class="tournament-controls">
                         <button id="start-tournament-btn" class="btn-primary" style="display:none;">Start Tournament</button>
+                        <button id="jump-to-current-match-btn" class="btn-primary" style="display:none;">Jump to Current Match</button>
                         <button id="leave-room-btn" class="btn-secondary">Leave Room</button>
                     </div>
                 </div>
@@ -457,6 +508,10 @@
             initEventListeners() {
                 document.getElementById('start-tournament-btn').addEventListener('click', () => {
                     this.sendMessage('start_tournament', {});
+                });
+
+                document.getElementById('jump-to-current-match-btn').addEventListener('click', () => {
+                    this.jumpToCurrentMatch();
                 });
 
                 document.getElementById('leave-room-btn').addEventListener('click', () => {
@@ -662,6 +717,7 @@
 
             handleTournamentState(data) {
                 const wasInSetup = this.status === 'setup';
+                const hadNoMatch = !this.currentMatch;
 
                 this.treeState = data.tree_state;
                 this.status = data.status;
@@ -671,9 +727,16 @@
 
                 this.renderBracket();
 
-                // Show start button if in setup
+                // Show/hide start button based on status
                 if (this.status === 'setup') {
                     document.getElementById('start-tournament-btn').style.display = 'block';
+                    document.getElementById('jump-to-current-match-btn').style.display = 'none';
+                } else if (this.status === 'in_progress' && this.currentMatchId) {
+                    document.getElementById('start-tournament-btn').style.display = 'none';
+                    document.getElementById('jump-to-current-match-btn').style.display = 'block';
+                } else {
+                    document.getElementById('start-tournament-btn').style.display = 'none';
+                    document.getElementById('jump-to-current-match-btn').style.display = 'none';
                 }
 
                 // Update currently open match if it exists
@@ -710,6 +773,48 @@
                             }
                         }
                     }
+                }
+
+                // When joining an already active tournament, open the current match
+                if (hadNoMatch && this.status === 'in_progress' && this.currentMatchId) {
+                    console.log('Joining active tournament, opening current match:', this.currentMatchId);
+                    // Find the current match
+                    const currentMatch = this.findMatchInTree(this.currentMatchId);
+                    if (currentMatch && currentMatch.song1 && currentMatch.song1.song_id &&
+                        currentMatch.song2 && currentMatch.song2.song_id) {
+                        setTimeout(() => {
+                            console.log('Opening current match for newly joined user');
+                            this.openMatch(currentMatch);
+                        }, 200);
+                    }
+                }
+            }
+
+            findMatchInTree(matchId) {
+                if (!this.treeState || !this.treeState.rounds) return null;
+
+                for (const round of this.treeState.rounds) {
+                    for (const match of round.matches) {
+                        if (match.match_id === matchId) {
+                            return match;
+                        }
+                    }
+                }
+                return null;
+            }
+
+            jumpToCurrentMatch() {
+                if (!this.currentMatchId) {
+                    alert('No current match available');
+                    return;
+                }
+
+                const currentMatch = this.findMatchInTree(this.currentMatchId);
+                if (currentMatch && currentMatch.song1 && currentMatch.song1.song_id &&
+                    currentMatch.song2 && currentMatch.song2.song_id) {
+                    this.openMatch(currentMatch);
+                } else {
+                    alert('Current match is not ready yet');
                 }
             }
 
@@ -1108,6 +1213,11 @@
                 // Hide rating form spoilers by default
                 document.getElementById('spoiler-content-1').style.display = 'none';
                 document.getElementById('spoiler-content-2').style.display = 'none';
+
+                // Notify server that this match is now current
+                this.sendMessage('start_match', {
+                    match_id: match.match_id
+                });
 
                 // Find which round this match is in
                 let roundName = 'Match';
