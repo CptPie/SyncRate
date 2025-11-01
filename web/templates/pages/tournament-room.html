@@ -1219,23 +1219,30 @@
                     match_id: match.match_id
                 });
 
-                // Find which round this match is in
+                // Find which round this match is in and its position
                 let roundName = 'Match';
                 if (this.treeState && this.treeState.rounds) {
                     const totalRounds = this.treeState.rounds.length;
                     for (let roundIndex = 0; roundIndex < totalRounds; roundIndex++) {
                         const round = this.treeState.rounds[roundIndex];
-                        if (round.matches.some(m => m.match_id === match.match_id)) {
+                        const matchIndex = round.matches.findIndex(m => m.match_id === match.match_id);
+                        if (matchIndex !== -1) {
+                            const matchNumber = matchIndex + 1;
+                            const totalMatches = round.matches.length;
                             const roundsFromEnd = totalRounds - roundIndex;
+
+                            let roundLabel = '';
                             if (roundsFromEnd === 1) {
-                                roundName = 'Match - Final';
+                                roundLabel = 'Final';
                             } else if (roundsFromEnd === 2) {
-                                roundName = 'Match - Semi Finals';
+                                roundLabel = 'Semi Finals';
                             } else if (roundsFromEnd === 3) {
-                                roundName = 'Match - Quarter Finals';
+                                roundLabel = 'Quarter Finals';
                             } else {
-                                roundName = `Match - Round ${roundIndex + 1}`;
+                                roundLabel = `Round ${roundIndex + 1}`;
                             }
+
+                            roundName = `Match ${matchNumber}/${totalMatches} - ${roundLabel}`;
                             break;
                         }
                     }
