@@ -220,15 +220,16 @@ func GetRadioRoomWS(db *gorm.DB) gin.HandlerFunc {
 func handleRadioRoomConnection(db *gorm.DB, roomID, userID string, conn *websocket.Conn) {
 	// Check if room exists in database
 	if err := checkRadioRoomExists(db, roomID); err != nil {
-		conn.WriteJSON(map[string]interface{}{
-			"type":  "error",
-			"error": "This radio room no longer exists",
+		radioRoomManager.SendToClient(userID, wsocket.WSMessage{
+			Type: "error",
+			Data: json.RawMessage(`{"error":"This radio room no longer exists"}`),
+			Timestamp: time.Now(),
 		})
 		return
 	}
 
 	// Send initial room state
-	sendRadioRoomState(db, roomID, conn)
+	sendRadioRoomState(db, roomID, userID)
 
 	// Listen for messages
 	for {
@@ -243,7 +244,7 @@ func handleRadioRoomConnection(db *gorm.DB, roomID, userID string, conn *websock
 }
 
 // sendRadioRoomState sends the current room state to a newly connected client
-func sendRadioRoomState(db *gorm.DB, roomID string, conn *websocket.Conn) {
+func sendRadioRoomState(db *gorm.DB, roomID string, userID string) {
 	// Get room from database
 	var room models.RadioRoom
 	if err := db.Preload("CurrentSong").Where("room_id = ?", roomID).First(&room).Error; err != nil {
@@ -259,11 +260,11 @@ func sendRadioRoomState(db *gorm.DB, roomID string, conn *websocket.Conn) {
 		Data:      settingsData,
 		Timestamp: time.Now(),
 	}
-	conn.WriteJSON(settingsMessage)
+	radioRoomManager.SendToClient(userID, settingsMessage)
 
 	// If there's a current song, send it
 	if room.CurrentSong != nil {
-		sendRadioSongData(db, roomID, *room.CurrentSong, conn)
+		sendRadioSongData(db, roomID, *room.CurrentSong, userID)
 	}
 }
 
@@ -272,9 +273,10 @@ func handleRadioRoomMessage(db *gorm.DB, roomID, userID string, msg wsocket.WSMe
 	// Check if room still exists in database
 	if err := checkRadioRoomExists(db, roomID); err != nil {
 		log.Printf("Radio room %s no longer exists: %v", roomID, err)
-		conn.WriteJSON(map[string]interface{}{
-			"type":  "error",
-			"error": "This radio room no longer exists. The page will reload.",
+		radioRoomManager.SendToClient(userID, wsocket.WSMessage{
+			Type: "error",
+			Data: json.RawMessage(`{"error":"This radio room no longer exists. The page will reload."}`),
+			Timestamp: time.Now(),
 		})
 		return
 	}
@@ -400,8 +402,8 @@ func broadcastRadioSongChange(db *gorm.DB, roomID string, song models.Song) {
 	sendRadioSongDataToRoom(db, roomID, song)
 }
 
-// sendRadioSongData sends song data to a specific connection
-func sendRadioSongData(db *gorm.DB, roomID string, song models.Song, conn *websocket.Conn) {
+// sendRadioSongData sends song data to a specific client
+func sendRadioSongData(db *gorm.DB, roomID string, song models.Song, userID string) {
 	// Load song with related data if not already loaded
 	var fullSong models.Song
 	if err := db.Preload("Artists").Preload("Units").Preload("Albums").Preload("Category").
@@ -484,7 +486,7 @@ func sendRadioSongData(db *gorm.DB, roomID string, song models.Song, conn *webso
 		Timestamp: time.Now(),
 	}
 
-	conn.WriteJSON(message)
+	radioRoomManager.SendToClient(userID, message)
 }
 
 // sendRadioSongDataToRoom broadcasts song data to all connections in the room

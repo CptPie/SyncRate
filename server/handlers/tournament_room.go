@@ -537,7 +537,7 @@ func GetTournamentRoomWS(db *gorm.DB) gin.HandlerFunc {
 // handleTournamentConnection manages the WebSocket connection for a tournament room
 func handleTournamentConnection(db *gorm.DB, roomID, userID string, conn *websocket.Conn) {
 	// Send initial tournament state
-	sendTournamentState(db, roomID, conn)
+	sendTournamentState(db, roomID, userID)
 
 	// Broadcast user update to all participants
 	broadcastTournamentUserUpdate(roomID)
@@ -555,7 +555,7 @@ func handleTournamentConnection(db *gorm.DB, roomID, userID string, conn *websoc
 }
 
 // sendTournamentState sends the current tournament state to a client
-func sendTournamentState(db *gorm.DB, roomID string, conn *websocket.Conn) {
+func sendTournamentState(db *gorm.DB, roomID string, userID string) {
 	var room models.TournamentRoom
 	if err := db.Where("room_id = ?", roomID).First(&room).Error; err != nil {
 		return
@@ -579,7 +579,7 @@ func sendTournamentState(db *gorm.DB, roomID string, conn *websocket.Conn) {
 		Timestamp: time.Now(),
 	}
 
-	conn.WriteJSON(message)
+	tournamentRoomManager.SendToClient(userID, message)
 }
 
 // handleTournamentMessage processes incoming WebSocket messages

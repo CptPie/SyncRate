@@ -245,15 +245,16 @@ func GetRatingRoomWS(db *gorm.DB) gin.HandlerFunc {
 func handleRoomConnection(db *gorm.DB, roomID, userID string, conn *websocket.Conn) {
 	// Check if room exists in database
 	if err := checkRoomExists(db, roomID); err != nil {
-		conn.WriteJSON(map[string]interface{}{
-			"type":  "error",
-			"error": "This rating room no longer exists",
+		roomManager.SendToClient(userID, wsocket.WSMessage{
+			Type: "error",
+			Data: json.RawMessage(`{"error":"This rating room no longer exists"}`),
+			Timestamp: time.Now(),
 		})
 		return
 	}
 
 	// Send initial room state
-	sendRoomState(db, roomID, conn)
+	sendRoomState(db, roomID, userID)
 
 	// Listen for messages
 	for {
@@ -268,7 +269,7 @@ func handleRoomConnection(db *gorm.DB, roomID, userID string, conn *websocket.Co
 }
 
 // sendRoomState sends the current room state to a newly connected client
-func sendRoomState(db *gorm.DB, roomID string, conn *websocket.Conn) {
+func sendRoomState(db *gorm.DB, roomID string, userID string) {
 	// Get room from database
 	var room models.RatingRoom
 	if err := db.Preload("CurrentSong").Where("room_id = ?", roomID).First(&room).Error; err != nil {
@@ -289,7 +290,7 @@ func sendRoomState(db *gorm.DB, roomID string, conn *websocket.Conn) {
 		Data:      settingsData,
 		Timestamp: time.Now(),
 	}
-	conn.WriteJSON(settingsMessage)
+	roomManager.SendToClient(userID, settingsMessage)
 
 	// If there's a current song, send it
 	if room.CurrentSong != nil {
@@ -372,7 +373,7 @@ func sendRoomState(db *gorm.DB, roomID string, conn *websocket.Conn) {
 				Timestamp: time.Now(),
 			}
 
-			conn.WriteJSON(message)
+			roomManager.SendToClient(userID, message)
 		}
 	}
 }
@@ -382,9 +383,10 @@ func handleRoomMessage(db *gorm.DB, roomID, userID string, msg wsocket.WSMessage
 	// Check if room still exists in database
 	if err := checkRoomExists(db, roomID); err != nil {
 		log.Printf("Room %s no longer exists: %v", roomID, err)
-		conn.WriteJSON(map[string]interface{}{
-			"type":  "error",
-			"error": "This rating room no longer exists. The page will reload.",
+		roomManager.SendToClient(userID, wsocket.WSMessage{
+			Type: "error",
+			Data: json.RawMessage(`{"error":"This rating room no longer exists. The page will reload."}`),
+			Timestamp: time.Now(),
 		})
 		return
 	}

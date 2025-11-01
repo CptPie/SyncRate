@@ -11,11 +11,12 @@ import (
 
 // Client represents a connected user in a rating room
 type Client struct {
-	ID       string          // User ID
-	Username string          // Username for display
-	Conn     *websocket.Conn // WebSocket connection
-	RoomID   string          // Which room they're in
-	LastSeen time.Time       // For cleanup
+	ID         string          // User ID
+	Username   string          // Username for display
+	Conn       *websocket.Conn // WebSocket connection
+	RoomID     string          // Which room they're in
+	LastSeen   time.Time       // For cleanup
+	WriteMutex sync.Mutex      // Ensures only one goroutine writes to the connection at a time
 }
 
 // Room represents an active rating room with connected clients
@@ -221,11 +222,33 @@ func (rm *RoomManager) BroadcastToRoom(roomID string, message WSMessage) {
 	messageBytes, _ := json.Marshal(message)
 
 	for _, client := range room.Clients {
-		if err := client.Conn.WriteMessage(websocket.TextMessage, messageBytes); err != nil {
+		// Lock the client's write mutex to prevent concurrent writes to the same connection
+		client.WriteMutex.Lock()
+		err := client.Conn.WriteMessage(websocket.TextMessage, messageBytes)
+		client.WriteMutex.Unlock()
+
+		if err != nil {
 			log.Printf("Error sending message to client %s: %v", client.ID, err)
 			// Client will be cleaned up by connection handler
 		}
 	}
+}
+
+// SendToClient sends a message to a specific client using their write mutex
+func (rm *RoomManager) SendToClient(userID string, message WSMessage) error {
+	rm.mutex.RLock()
+	client, exists := rm.clients[userID]
+	rm.mutex.RUnlock()
+
+	if !exists {
+		return &RoomError{Message: "Client not found"}
+	}
+
+	// Lock the client's write mutex to prevent concurrent writes
+	client.WriteMutex.Lock()
+	defer client.WriteMutex.Unlock()
+
+	return client.Conn.WriteJSON(message)
 }
 
 // GetRoom returns a room by ID
