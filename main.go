@@ -43,6 +43,10 @@ func main() {
 	handlers.StartTournamentDatabaseCleanup(db.DB)
 	log.Println("Started database cleanup routine for tournament rooms")
 
+	// Start background cleanup for old quiz rooms
+	handlers.StartQuizDatabaseCleanup(db.DB)
+	log.Println("Started database cleanup routine for quiz rooms")
+
 	// Start web server
 	r := router.SetupRouter(db.DB)
 

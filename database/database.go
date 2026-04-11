@@ -108,6 +108,13 @@ func (db *Database) Migrate() error {
 	}
 	fmt.Println("✓ TournamentRoom table migrated successfully")
 
+	fmt.Println("Starting migration for QuizRoom table...")
+	err = db.DB.AutoMigrate(&models.QuizRoom{})
+	if err != nil {
+		return fmt.Errorf("migration failed for QuizRoom: %s", err.Error())
+	}
+	fmt.Println("✓ QuizRoom table migrated successfully")
+
 	// Migrate join tables
 	fmt.Println("Starting migration for SongArtist join table...")
 	err = db.DB.AutoMigrate(&models.SongArtist{})

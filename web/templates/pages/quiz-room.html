@@ -1,0 +1,1527 @@
+{{define "quiz-room.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {{template "head" .}}
+    <style>
+        .quiz-container {
+            padding: 20px;
+        }
+        .quiz-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: var(--bg-primary);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        .quiz-header h2 {
+            margin: 0;
+            color: var(--accent-primary);
+        }
+        .quiz-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .quiz-controls button {
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+        .quiz-controls button:hover {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+            color: var(--text-primary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Scoreboard */
+        .quiz-scoreboard {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .quiz-scoreboard h3 {
+            margin: 0 0 10px 0;
+            color: var(--accent-primary);
+        }
+        .score-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .score-entry {
+            background: var(--bg-secondary);
+            padding: 8px 15px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .score-username {
+            font-weight: 500;
+        }
+        .score-points {
+            color: var(--accent-primary);
+            font-weight: 700;
+            font-size: 1.1em;
+        }
+
+        /* Round info */
+        .quiz-round-info {
+            text-align: center;
+            padding: 10px;
+            margin-bottom: 15px;
+            color: var(--text-secondary);
+            font-size: 1.1em;
+        }
+
+        /* Audio player area */
+        .quiz-audio-area {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .audio-progress-container {
+            width: 100%;
+            height: 8px;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+        .audio-progress-bar {
+            height: 100%;
+            background: var(--accent-primary);
+            border-radius: 4px;
+            transition: width 0.1s linear;
+            width: 0%;
+        }
+        .audio-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        .audio-controls button {
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            background: var(--accent-primary);
+            color: white;
+            border: none;
+            transition: all 0.2s;
+        }
+        .audio-controls button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        .audio-controls button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .audio-time-display {
+            font-size: 14px;
+            color: var(--text-secondary);
+            min-width: 80px;
+        }
+        .stage-info {
+            margin-top: 10px;
+            color: var(--text-secondary);
+            font-size: 0.9em;
+        }
+
+        /* Hidden YouTube player */
+        #youtube-player-container {
+            position: absolute;
+            top: -9999px;
+            left: -9999px;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+        }
+
+        /* Guess area */
+        .quiz-guess-area {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .guess-field {
+            margin-bottom: 15px;
+            position: relative;
+        }
+        .guess-field label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+        .guess-field input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .guess-field .dropdown {
+            position: absolute;
+            z-index: 100;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            max-height: 200px;
+            overflow-y: auto;
+            left: 0;
+            right: 0;
+            box-sizing: border-box;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        .guess-field .dropdown-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .guess-field .dropdown-item:hover,
+        .guess-field .dropdown-item.highlighted {
+            background: var(--accent-primary);
+            color: white;
+        }
+        .past-guesses {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 6px;
+        }
+        .past-guess-tag {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            text-decoration: line-through;
+        }
+        .guess-status {
+            display: inline-block;
+            margin-left: 10px;
+            font-weight: 600;
+        }
+        .guess-status.correct {
+            color: #4caf50;
+        }
+        .guess-status.incorrect {
+            color: var(--text-secondary);
+        }
+        .guess-submit-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .guess-submit-row button {
+            padding: 10px 25px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            background: var(--accent-primary);
+            color: white;
+            border: none;
+            transition: all 0.2s;
+        }
+        .guess-submit-row button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        .guess-submit-row button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Guess status indicators for other players */
+        .players-guess-status {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border-color);
+        }
+        .player-guess-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+        }
+        .player-guess-badge.title-correct {
+            border-color: #4caf50;
+            background: rgba(76, 175, 80, 0.15);
+        }
+        .player-guess-badge.artist-correct {
+            border-color: #2196f3;
+            background: rgba(33, 150, 243, 0.15);
+        }
+        .player-guess-badge.all-correct {
+            border-color: #ff9800;
+            background: rgba(255, 152, 0, 0.15);
+        }
+
+        /* Results area */
+        .quiz-results-area {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .results-song-info {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+        .results-thumbnail {
+            width: 120px;
+            height: 90px;
+            object-fit: cover;
+            border-radius: 6px;
+            flex-shrink: 0;
+        }
+        .results-song-details h3 {
+            margin: 0 0 5px 0;
+            color: var(--accent-primary);
+        }
+        .results-song-details p {
+            margin: 3px 0;
+            color: var(--text-secondary);
+        }
+        .results-guesses {
+            margin-top: 15px;
+        }
+        .results-guesses h4 {
+            margin: 0 0 10px 0;
+        }
+        .result-guess-entry {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 5px;
+            background: var(--bg-secondary);
+        }
+        .result-guess-entry .points {
+            color: var(--accent-primary);
+            font-weight: 700;
+        }
+        .result-guess-entry .correct-mark {
+            color: #4caf50;
+        }
+        .result-guess-entry .incorrect-mark {
+            color: #f44336;
+        }
+
+        /* Video embed in results */
+        .results-video {
+            margin-top: 15px;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .results-video iframe {
+            width: 100%;
+            aspect-ratio: 16/9;
+            border: none;
+            border-radius: 8px;
+        }
+
+        /* Rating form in results */
+        .results-rating-section {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+        }
+        .results-rating-section .spoiler-btn {
+            cursor: pointer;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 8px 15px;
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .results-rating-section .spoiler-btn:hover {
+            background: var(--accent-primary);
+            color: white;
+        }
+
+        /* Waiting screen */
+        .quiz-waiting {
+            text-align: center;
+            padding: 40px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+        .quiz-waiting h3 {
+            color: var(--accent-primary);
+        }
+
+        /* Users panel */
+        .quiz-users {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .quiz-users h3 {
+            margin: 0 0 10px 0;
+            font-size: 0.95em;
+            color: var(--text-secondary);
+        }
+        .users-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .user-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        @media (max-width: 768px) {
+            .quiz-header {
+                flex-direction: column;
+                gap: 15px;
+                align-items: stretch;
+            }
+            .quiz-header h2 {
+                text-align: center;
+            }
+            .quiz-controls {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            .results-song-info {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        {{template "header" .}}
+        <main>
+            <div class="quiz-container">
+                <div class="quiz-header">
+                    <h2>Quiz Room: {{.room_id}}</h2>
+                    <div class="quiz-controls" id="quiz-controls">
+                        <button id="start-quiz-btn" style="display: none;">Start Quiz</button>
+                        <button id="next-round-btn" style="display: none;">Next Round</button>
+                        <button id="advance-stage-btn" style="display: none;">Advance Stage</button>
+                        <button id="complete-round-btn" style="display: none;">Show Results</button>
+                    </div>
+                </div>
+
+                <div class="quiz-users" id="users-panel">
+                    <h3>Connected Users</h3>
+                    <div class="users-list" id="users-list"></div>
+                </div>
+
+                <div class="quiz-scoreboard" id="scoreboard" style="display: none;">
+                    <h3>Scoreboard</h3>
+                    <div class="score-list" id="score-list"></div>
+                </div>
+
+                <div class="quiz-round-info" id="round-info"></div>
+
+                <!-- Waiting screen -->
+                <div class="quiz-waiting" id="waiting-screen">
+                    <h3>Waiting to start...</h3>
+                    <p>Press "Start Quiz" to begin!</p>
+                </div>
+
+                <!-- Audio player area -->
+                <div class="quiz-audio-area" id="audio-area" style="display: none;">
+                    <div id="youtube-player-container">
+                        <div id="youtube-player"></div>
+                    </div>
+                    <div class="audio-progress-container">
+                        <div class="audio-progress-bar" id="audio-progress"></div>
+                    </div>
+                    <div class="audio-controls">
+                        <button id="play-pause-btn" disabled>Play</button>
+                        <button id="replay-btn" disabled>Replay</button>
+                        <div class="audio-time-display" id="audio-time">0:00 / 0:00</div>
+                    </div>
+                    <div class="stage-info" id="stage-info"></div>
+                </div>
+
+                <!-- Guess area -->
+                <div class="quiz-guess-area" id="guess-area" style="display: none;">
+                    <div class="guess-field" id="title-guess-field" style="display: none;">
+                        <label>Song Title: <span class="guess-status" id="title-guess-status"></span></label>
+                        <input type="text" id="title-guess-input" placeholder="Type your guess..." autocomplete="off" />
+                        <div class="dropdown" id="title-guess-dropdown" style="display: none;"></div>
+                        <div class="past-guesses" id="title-past-guesses"></div>
+                    </div>
+
+                    <div class="guess-field" id="artist-guess-field" style="display: none;">
+                        <label>Artist / Group: <span class="guess-status" id="artist-guess-status"></span></label>
+                        <input type="text" id="artist-guess-input" placeholder="Type your guess..." autocomplete="off" />
+                        <div class="dropdown" id="artist-guess-dropdown" style="display: none;"></div>
+                        <div class="past-guesses" id="artist-past-guesses"></div>
+                    </div>
+
+                    <div class="guess-submit-row">
+                        <button id="submit-guess-btn">Submit Guess</button>
+                    </div>
+
+                    <div class="players-guess-status" id="players-guess-status"></div>
+                </div>
+
+                <!-- Results area (shown after round completes) -->
+                <div class="quiz-results-area" id="results-area" style="display: none;"></div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/theme-toggle.js"></script>
+    <script>
+        // Song/artist data for fuzzy search (only loaded if fuzzy_input enabled)
+        const songsData = JSON.parse('{{.songsJSON}}');
+        const artistsData = JSON.parse('{{.artistsJSON}}');
+        const unitsData = JSON.parse('{{.unitsJSON}}');
+
+        // Combine artists and units for artist guessing
+        const artistGuessData = [
+            ...artistsData.map(a => ({ id: a.ArtistID, name: a.NameEnglish || a.NameOriginal, original: a.NameOriginal, type: 'artist' })),
+            ...unitsData.map(u => ({ id: u.UnitID, name: u.NameEnglish || u.NameOriginal, original: u.NameOriginal, type: 'unit' }))
+        ];
+
+        const songGuessData = songsData.map(s => ({
+            id: s.SongID,
+            name: s.NameEnglish || s.NameOriginal,
+            original: s.NameOriginal,
+            type: 'song'
+        }));
+
+        // Note: JSON field names match Go struct field names (PascalCase)
+        // Song: SongID, NameOriginal, NameEnglish
+        // Artist: ArtistID, NameOriginal, NameEnglish
+        // Unit: UnitID, NameOriginal, NameEnglish
+
+        class QuizRoom {
+            constructor(roomId) {
+                this.roomId = roomId;
+                this.ws = null;
+                this.quizState = null;
+                this.player = null;
+                this.playerReady = false;
+                this.isPlaying = false;
+                this.progressInterval = null;
+                this.audioStartTime = 0;
+                this.currentMaxDuration = 0;
+                this.playStartedAt = 0;
+                this.elapsedBeforePause = 0;
+                this.titleCorrect = false;
+                this.artistCorrect = false;
+                this.titleGuesses = [];
+                this.artistGuesses = [];
+                this.existingVotes = {};
+
+                this.initWebSocket();
+                this.initYouTubePlayer();
+                this.bindEvents();
+                this.setupGuessInputs();
+            }
+
+            initWebSocket() {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                this.ws = new WebSocket(`${protocol}//${window.location.host}/quiz-room/${this.roomId}/ws`);
+
+                this.ws.onmessage = (event) => {
+                    const message = JSON.parse(event.data);
+                    this.handleMessage(message);
+                };
+
+                this.ws.onclose = () => {
+                    console.log('WebSocket closed');
+                    setTimeout(() => this.initWebSocket(), 3000);
+                };
+
+                this.ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                };
+            }
+
+            initYouTubePlayer() {
+                const createPlayer = () => {
+                    this.player = new YT.Player('youtube-player', {
+                        height: '1',
+                        width: '1',
+                        playerVars: {
+                            autoplay: 0,
+                            controls: 0,
+                            disablekb: 1,
+                            modestbranding: 1,
+                        },
+                        events: {
+                            onReady: () => {
+                                this.playerReady = true;
+                                console.log('YouTube player ready');
+                            },
+                            onStateChange: (event) => {
+                                if (event.data === YT.PlayerState.ENDED) {
+                                    this.onAudioEnded();
+                                }
+                            },
+                            onError: (event) => {
+                                console.error('YouTube player error:', event.data);
+                                // Recover: recreate the player element and reinitialize
+                                this.playerReady = false;
+                                this.isPlaying = false;
+                                const container = document.getElementById('youtube-player-container');
+                                container.innerHTML = '<div id="youtube-player"></div>';
+                                setTimeout(() => createPlayer(), 1000);
+                            }
+                        }
+                    });
+                };
+
+                if (window.YT && window.YT.Player) {
+                    createPlayer();
+                } else {
+                    const tag = document.createElement('script');
+                    tag.src = 'https://www.youtube.com/iframe_api';
+                    document.head.appendChild(tag);
+                    window.onYouTubeIframeAPIReady = () => createPlayer();
+                }
+            }
+
+            bindEvents() {
+                document.getElementById('start-quiz-btn').addEventListener('click', () => {
+                    this.sendMessage('start_quiz', {});
+                });
+
+                document.getElementById('next-round-btn').addEventListener('click', () => {
+                    this.sendMessage('next_round', {});
+                });
+
+                document.getElementById('advance-stage-btn').addEventListener('click', () => {
+                    this.sendMessage('advance_stage', {});
+                });
+
+                document.getElementById('complete-round-btn').addEventListener('click', () => {
+                    this.sendMessage('complete_round', {});
+                });
+
+                document.getElementById('play-pause-btn').addEventListener('click', () => {
+                    this.togglePlayPause();
+                });
+
+                document.getElementById('replay-btn').addEventListener('click', () => {
+                    this.replayAudio();
+                });
+
+                document.getElementById('submit-guess-btn').addEventListener('click', () => {
+                    this.submitGuess();
+                });
+            }
+
+            setupGuessInputs() {
+                // Set up fuzzy search dropdowns for guess inputs
+                // Pass a getter for the guesses array so the dropdown filters dynamically
+                this.setupFuzzyDropdown('title-guess-input', 'title-guess-dropdown', songGuessData, () => this.titleGuesses);
+                this.setupFuzzyDropdown('artist-guess-input', 'artist-guess-dropdown', artistGuessData, () => this.artistGuesses);
+            }
+
+            setupFuzzyDropdown(inputId, dropdownId, data, getGuesses) {
+                const input = document.getElementById(inputId);
+                const dropdown = document.getElementById(dropdownId);
+                let highlightedIndex = -1;
+
+                input.addEventListener('input', () => {
+                    const query = input.value.trim().toLowerCase();
+                    if (query.length === 0) {
+                        dropdown.style.display = 'none';
+                        return;
+                    }
+
+                    // Get already-guessed values to exclude
+                    const guessed = (getGuesses() || []).map(g => g.toLowerCase());
+
+                    // Score and filter
+                    const scored = data.filter(item => {
+                        // Exclude already-guessed items
+                        const nameLower = item.name.toLowerCase();
+                        const origLower = (item.original || '').toLowerCase();
+                        return !guessed.includes(nameLower) && !guessed.includes(origLower);
+                    }).map(item => {
+                        const nameLower = item.name.toLowerCase();
+                        const origLower = (item.original || '').toLowerCase();
+                        let score = 0;
+
+                        // Exact substring
+                        if (nameLower.includes(query) || origLower.includes(query)) {
+                            score = 100 - Math.abs(nameLower.length - query.length);
+                        } else {
+                            // Fuzzy: all chars in order
+                            let qi = 0;
+                            for (let ci = 0; ci < nameLower.length && qi < query.length; ci++) {
+                                if (nameLower[ci] === query[qi]) qi++;
+                            }
+                            if (qi === query.length) {
+                                score = 50 - Math.abs(nameLower.length - query.length);
+                            }
+                        }
+
+                        return { ...item, score };
+                    }).filter(item => item.score > 0)
+                      .sort((a, b) => b.score - a.score)
+                      .slice(0, 10);
+
+                    if (scored.length === 0) {
+                        dropdown.style.display = 'none';
+                        return;
+                    }
+
+                    dropdown.innerHTML = '';
+                    highlightedIndex = -1;
+
+                    scored.forEach((item, idx) => {
+                        const div = document.createElement('div');
+                        div.className = 'dropdown-item';
+                        div.textContent = item.original && item.original !== item.name
+                            ? `${item.name} (${item.original})`
+                            : item.name;
+                        div.addEventListener('click', () => {
+                            // For fuzzy mode, set the original name (or english) as the value
+                            input.value = item.original || item.name;
+                            dropdown.style.display = 'none';
+                        });
+                        dropdown.appendChild(div);
+                    });
+
+                    dropdown.style.display = 'block';
+                });
+
+                input.addEventListener('keydown', (e) => {
+                    const items = dropdown.querySelectorAll('.dropdown-item');
+                    if (items.length === 0) return;
+
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        highlightedIndex = Math.min(highlightedIndex + 1, items.length - 1);
+                        items.forEach((item, i) => item.classList.toggle('highlighted', i === highlightedIndex));
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        highlightedIndex = Math.max(highlightedIndex - 1, 0);
+                        items.forEach((item, i) => item.classList.toggle('highlighted', i === highlightedIndex));
+                    } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (highlightedIndex >= 0 && highlightedIndex < items.length) {
+                            items[highlightedIndex].click();
+                        }
+                    } else if (e.key === 'Escape') {
+                        dropdown.style.display = 'none';
+                    }
+                });
+
+                // Close on outside click
+                document.addEventListener('click', (e) => {
+                    if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+                        dropdown.style.display = 'none';
+                    }
+                });
+            }
+
+            sendMessage(type, data) {
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.send(JSON.stringify({
+                        type: type,
+                        data: data,
+                        timestamp: new Date().toISOString()
+                    }));
+                }
+            }
+
+            handleMessage(message) {
+                switch (message.type) {
+                    case 'quiz_state':
+                        this.handleQuizState(message.data);
+                        break;
+                    case 'guess_update':
+                        this.handleGuessUpdate(message.data);
+                        break;
+                    case 'round_complete':
+                        this.handleRoundComplete(message.data);
+                        break;
+                    case 'user_update':
+                        this.handleUserUpdate(message.data);
+                        break;
+                    case 'vote_update':
+                        this.handleVoteUpdate(message.data);
+                        break;
+                    case 'error':
+                        console.error('Server error:', message.data);
+                        break;
+                }
+            }
+
+            handleQuizState(data) {
+                const prevState = this.quizState;
+                this.quizState = data;
+
+                this.updateUI();
+
+                // Detect new round started
+                if (data.current_round > 0 && data.rounds && data.rounds.length > 0) {
+                    const currentRound = data.rounds[data.current_round - 1];
+                    if (currentRound && currentRound.status === 'playing') {
+                        const isNewRound = !prevState ||
+                            prevState.current_round !== data.current_round ||
+                            (prevState.rounds && prevState.rounds[prevState.current_round - 1] &&
+                             prevState.rounds[prevState.current_round - 1].status !== 'playing');
+
+                        if (isNewRound) {
+                            this.startRoundAudio(currentRound);
+                        }
+
+                        // Stage advancement
+                        if (prevState && prevState.current_stage !== data.current_stage) {
+                            this.updateAudioForStage(data.current_stage);
+                        }
+                    }
+                }
+            }
+
+            handleGuessUpdate(data) {
+                this.updatePlayersGuessStatus(data);
+            }
+
+            handleRoundComplete(data) {
+                this.stopAudio();
+                if (data.existing_votes) {
+                    this.existingVotes = data.existing_votes;
+                }
+                // The quiz_state update following this will trigger UI refresh
+            }
+
+            handleUserUpdate(data) {
+                const usersList = document.getElementById('users-list');
+                usersList.innerHTML = '';
+                if (data.users) {
+                    data.users.forEach(user => {
+                        const badge = document.createElement('span');
+                        badge.className = 'user-badge';
+                        badge.textContent = user.username;
+                        usersList.appendChild(badge);
+                    });
+                }
+            }
+
+            handleVoteUpdate(data) {
+                // Update local vote cache
+                if (data.song_id) {
+                    if (!this.existingVotes[data.song_id]) {
+                        this.existingVotes[data.song_id] = [];
+                    }
+                    this.existingVotes[data.song_id] = this.existingVotes[data.song_id].filter(
+                        v => v.user_id !== data.user_id
+                    );
+                    this.existingVotes[data.song_id].push(data);
+                }
+            }
+
+            updateUI() {
+                if (!this.quizState) return;
+
+                const state = this.quizState;
+                const startBtn = document.getElementById('start-quiz-btn');
+                const nextBtn = document.getElementById('next-round-btn');
+                const advanceBtn = document.getElementById('advance-stage-btn');
+                const completeBtn = document.getElementById('complete-round-btn');
+                const waitingScreen = document.getElementById('waiting-screen');
+                const audioArea = document.getElementById('audio-area');
+                const guessArea = document.getElementById('guess-area');
+                const resultsArea = document.getElementById('results-area');
+                const scoreboard = document.getElementById('scoreboard');
+                const roundInfo = document.getElementById('round-info');
+
+                // Show/hide start button
+                startBtn.style.display = state.status === 'setup' ? 'inline-block' : 'none';
+
+                // Update scoreboard
+                if (state.scores && state.scores.length > 0) {
+                    scoreboard.style.display = 'block';
+                    this.updateScoreboard(state.scores);
+                }
+
+                // Current round
+                const currentRound = state.current_round > 0 && state.rounds
+                    ? state.rounds[state.current_round - 1]
+                    : null;
+
+                // Round info
+                if (state.current_round > 0) {
+                    let info = `Round ${state.current_round}`;
+                    if (state.max_rounds) {
+                        info += ` / ${state.max_rounds}`;
+                    }
+                    roundInfo.textContent = info;
+                } else {
+                    roundInfo.textContent = '';
+                }
+
+                if (state.status === 'setup') {
+                    waitingScreen.style.display = 'block';
+                    audioArea.style.display = 'none';
+                    guessArea.style.display = 'none';
+                    resultsArea.style.display = 'none';
+                    nextBtn.style.display = 'none';
+                    advanceBtn.style.display = 'none';
+                    completeBtn.style.display = 'none';
+                    return;
+                }
+
+                waitingScreen.style.display = 'none';
+
+                if (!currentRound) return;
+
+                if (currentRound.status === 'playing') {
+                    audioArea.style.display = 'block';
+                    guessArea.style.display = 'block';
+                    resultsArea.style.display = 'none';
+                    nextBtn.style.display = 'none';
+
+                    // Show advance/complete buttons based on style
+                    if (state.quiz_style === 'progressive') {
+                        const isLastStage = state.current_stage >= 4;
+                        advanceBtn.style.display = isLastStage ? 'none' : 'inline-block';
+                        completeBtn.style.display = 'inline-block';
+                    } else {
+                        advanceBtn.style.display = 'none';
+                        completeBtn.style.display = 'inline-block';
+                    }
+
+                    // Show/hide guess fields based on question type
+                    document.getElementById('title-guess-field').style.display =
+                        (state.question_type === 'title' || state.question_type === 'both') ? 'block' : 'none';
+                    document.getElementById('artist-guess-field').style.display =
+                        (state.question_type === 'artist' || state.question_type === 'both') ? 'block' : 'none';
+
+                    // Restore guess status from state
+                    this.restoreGuessStatus(currentRound);
+
+                    // Update stage info
+                    this.updateStageInfo(state);
+
+                    // Update player guess badges
+                    this.updateAllPlayersGuessStatus(currentRound);
+                } else if (currentRound.status === 'completed') {
+                    audioArea.style.display = 'none';
+                    guessArea.style.display = 'none';
+                    resultsArea.style.display = 'block';
+                    advanceBtn.style.display = 'none';
+                    completeBtn.style.display = 'none';
+
+                    // Show next round button (unless max rounds reached)
+                    const maxReached = state.max_rounds && state.current_round >= state.max_rounds;
+                    nextBtn.style.display = maxReached ? 'none' : 'inline-block';
+                    nextBtn.textContent = maxReached ? '' : 'Next Round';
+
+                    this.showRoundResults(currentRound);
+                }
+            }
+
+            updateScoreboard(scores) {
+                const scoreList = document.getElementById('score-list');
+                // Sort by score descending
+                const sorted = [...scores].sort((a, b) => b.score - a.score);
+                scoreList.innerHTML = sorted.map(s =>
+                    `<div class="score-entry">
+                        <span class="score-username">${s.username}</span>
+                        <span class="score-points">${s.score} pts</span>
+                    </div>`
+                ).join('');
+            }
+
+            updateStageInfo(state) {
+                const stageInfo = document.getElementById('stage-info');
+                if (state.quiz_style === 'progressive') {
+                    const stages = [1, 5, 10, 30, 60];
+                    const points = [10, 8, 5, 3, 1];
+                    const current = state.current_stage;
+                    stageInfo.textContent = `Stage ${current + 1}/5 - ${stages[current]}s clip - ${points[current]} points`;
+                } else {
+                    stageInfo.textContent = `${state.fixed_time_limit}s clip - 1 point per correct guess`;
+                }
+            }
+
+            restoreGuessStatus(round) {
+                const currentUserId = this.getCurrentUserId();
+                const userGuess = round.user_guesses ?
+                    round.user_guesses.find(g => g.user_id === currentUserId) : null;
+
+                this.titleCorrect = userGuess ? userGuess.title_correct : false;
+                this.artistCorrect = userGuess ? userGuess.artist_correct : false;
+
+                const currentStage1 = (this.quizState.current_stage || 0) + 1; // 1-indexed
+                const titleGuessedThisStage = userGuess && userGuess.title_guess_stage >= currentStage1;
+                const artistGuessedThisStage = userGuess && userGuess.artist_guess_stage >= currentStage1;
+
+                const titleStatus = document.getElementById('title-guess-status');
+                const artistStatus = document.getElementById('artist-guess-status');
+                const titleInput = document.getElementById('title-guess-input');
+                const artistInput = document.getElementById('artist-guess-input');
+
+                if (this.titleCorrect) {
+                    titleStatus.textContent = 'Correct!';
+                    titleStatus.className = 'guess-status correct';
+                    titleInput.disabled = true;
+                } else if (titleGuessedThisStage) {
+                    titleStatus.textContent = 'Incorrect';
+                    titleStatus.className = 'guess-status incorrect';
+                    titleInput.disabled = true;
+                } else {
+                    titleStatus.textContent = '';
+                    titleStatus.className = 'guess-status';
+                    titleInput.disabled = false;
+                }
+
+                if (this.artistCorrect) {
+                    artistStatus.textContent = 'Correct!';
+                    artistStatus.className = 'guess-status correct';
+                    artistInput.disabled = true;
+                } else if (artistGuessedThisStage) {
+                    artistStatus.textContent = 'Incorrect';
+                    artistStatus.className = 'guess-status incorrect';
+                    artistInput.disabled = true;
+                } else {
+                    artistStatus.textContent = '';
+                    artistStatus.className = 'guess-status';
+                    artistInput.disabled = false;
+                }
+
+                // Disable submit if all correct or all fields already guessed this stage
+                const allNeededCorrect = this.checkAllCorrect();
+                const qt = this.quizState.question_type;
+                const allGuessedThisStage =
+                    ((qt === 'title' || qt === 'both') ? (this.titleCorrect || titleGuessedThisStage) : true) &&
+                    ((qt === 'artist' || qt === 'both') ? (this.artistCorrect || artistGuessedThisStage) : true);
+
+                const submitBtn = document.getElementById('submit-guess-btn');
+                submitBtn.disabled = allNeededCorrect || allGuessedThisStage;
+                if (allNeededCorrect) {
+                    submitBtn.textContent = 'All Correct!';
+                } else if (allGuessedThisStage) {
+                    submitBtn.textContent = 'Wait for next stage...';
+                } else {
+                    submitBtn.textContent = 'Submit Guess';
+                }
+            }
+
+            checkAllCorrect() {
+                if (!this.quizState) return false;
+                const qt = this.quizState.question_type;
+                if (qt === 'both') return this.titleCorrect && this.artistCorrect;
+                if (qt === 'title') return this.titleCorrect;
+                if (qt === 'artist') return this.artistCorrect;
+                return false;
+            }
+
+            // --- Audio ---
+
+            startRoundAudio(round) {
+                this.stopAudio();
+                this.titleCorrect = false;
+                this.artistCorrect = false;
+                this.elapsedBeforePause = 0;
+                this.playStartedAt = 0;
+
+                // Clear guess inputs and past guesses
+                document.getElementById('title-guess-input').value = '';
+                document.getElementById('artist-guess-input').value = '';
+                document.getElementById('title-guess-input').disabled = false;
+                document.getElementById('artist-guess-input').disabled = false;
+                document.getElementById('title-guess-status').textContent = '';
+                document.getElementById('artist-guess-status').textContent = '';
+                document.getElementById('submit-guess-btn').disabled = false;
+                document.getElementById('submit-guess-btn').textContent = 'Submit Guess';
+                this.titleGuesses = [];
+                this.artistGuesses = [];
+                document.getElementById('title-past-guesses').innerHTML = '';
+                document.getElementById('artist-past-guesses').innerHTML = '';
+
+                if (!round.song || !round.song.embed_url) return;
+
+                this.audioStartTime = round.audio_start_time;
+
+                // Calculate max duration for current stage/mode
+                this.updateMaxDuration();
+
+                // Load video without auto-playing
+                const videoId = this.extractVideoId(round.song.embed_url);
+                if (videoId && this.playerReady) {
+                    this.player.cueVideoById({
+                        videoId: videoId,
+                        startSeconds: this.audioStartTime,
+                    });
+                    this.isPlaying = false;
+                    document.getElementById('play-pause-btn').textContent = 'Play';
+                    document.getElementById('play-pause-btn').disabled = false;
+                    document.getElementById('replay-btn').disabled = false;
+                }
+
+                this.updateProgressBar();
+            }
+
+            updateAudioForStage(newStage) {
+                // When stage advances in progressive mode, extend the allowed duration
+                this.updateMaxDuration();
+
+                // If audio was stopped because time ran out, let user play again
+                document.getElementById('play-pause-btn').disabled = false;
+                this.updateProgressBar();
+            }
+
+            updateMaxDuration() {
+                if (!this.quizState) return;
+
+                if (this.quizState.quiz_style === 'progressive') {
+                    const stages = [1, 5, 10, 30, 60];
+                    this.currentMaxDuration = stages[this.quizState.current_stage] || 60;
+                } else {
+                    this.currentMaxDuration = this.quizState.fixed_time_limit || 30;
+                }
+
+                // Update time display
+                this.updateTimeDisplay(Math.min(this.getElapsedTime(), this.currentMaxDuration));
+            }
+
+            togglePlayPause() {
+                if (!this.player || !this.playerReady) return;
+
+                if (this.isPlaying) {
+                    this.player.pauseVideo();
+                    this.elapsedBeforePause += (Date.now() - this.playStartedAt) / 1000;
+                    this.isPlaying = false;
+                    document.getElementById('play-pause-btn').textContent = 'Play';
+                    this.stopProgressTracking();
+                } else {
+                    // Check if we've exceeded allowed time
+                    if (this.getElapsedTime() >= this.currentMaxDuration) {
+                        return; // Can't play more
+                    }
+
+                    // Seek to correct position
+                    const seekTo = this.audioStartTime + this.getElapsedTime();
+                    this.player.seekTo(seekTo, true);
+                    this.player.playVideo();
+                    this.playStartedAt = Date.now();
+                    this.isPlaying = true;
+                    document.getElementById('play-pause-btn').textContent = 'Pause';
+                    this.startProgressTracking();
+                }
+            }
+
+            getElapsedTime() {
+                let elapsed = this.elapsedBeforePause;
+                if (this.isPlaying) {
+                    elapsed += (Date.now() - this.playStartedAt) / 1000;
+                }
+                return elapsed;
+            }
+
+            startProgressTracking() {
+                this.stopProgressTracking();
+                this.progressInterval = setInterval(() => {
+                    const elapsed = this.getElapsedTime();
+                    this.updateProgressBar();
+                    this.updateTimeDisplay(elapsed);
+
+                    // Stop at max duration
+                    if (elapsed >= this.currentMaxDuration) {
+                        this.player.pauseVideo();
+                        this.elapsedBeforePause = this.currentMaxDuration;
+                        this.isPlaying = false;
+                        document.getElementById('play-pause-btn').textContent = 'Play';
+                        document.getElementById('play-pause-btn').disabled = true;
+                        this.stopProgressTracking();
+                    }
+                }, 100);
+            }
+
+            stopProgressTracking() {
+                if (this.progressInterval) {
+                    clearInterval(this.progressInterval);
+                    this.progressInterval = null;
+                }
+            }
+
+            updateProgressBar() {
+                const elapsed = Math.min(this.getElapsedTime(), this.currentMaxDuration);
+                const pct = this.currentMaxDuration > 0 ? (elapsed / this.currentMaxDuration) * 100 : 0;
+                document.getElementById('audio-progress').style.width = `${pct}%`;
+            }
+
+            updateTimeDisplay(elapsed) {
+                const clampedElapsed = Math.min(elapsed, this.currentMaxDuration);
+                const elapsedStr = this.formatTime(clampedElapsed);
+                const totalStr = this.formatTime(this.currentMaxDuration);
+                document.getElementById('audio-time').textContent = `${elapsedStr} / ${totalStr}`;
+            }
+
+            formatTime(seconds) {
+                const m = Math.floor(seconds / 60);
+                const s = Math.floor(seconds % 60);
+                return `${m}:${s.toString().padStart(2, '0')}`;
+            }
+
+            stopAudio() {
+                this.stopProgressTracking();
+                if (this.player && this.playerReady) {
+                    try { this.player.pauseVideo(); } catch (e) {}
+                }
+                this.isPlaying = false;
+                this.elapsedBeforePause = 0;
+                this.playStartedAt = 0;
+            }
+
+            onAudioEnded() {
+                this.isPlaying = false;
+                document.getElementById('play-pause-btn').textContent = 'Play';
+                this.stopProgressTracking();
+            }
+
+            replayAudio() {
+                if (!this.player || !this.playerReady) return;
+
+                // Reset elapsed time and seek back to start of clip
+                this.stopProgressTracking();
+                if (this.isPlaying) {
+                    this.player.pauseVideo();
+                }
+                this.elapsedBeforePause = 0;
+                this.playStartedAt = 0;
+                this.isPlaying = false;
+
+                this.player.seekTo(this.audioStartTime, true);
+                this.player.playVideo();
+                this.playStartedAt = Date.now();
+                this.isPlaying = true;
+
+                document.getElementById('play-pause-btn').textContent = 'Pause';
+                document.getElementById('play-pause-btn').disabled = false;
+                this.updateProgressBar();
+                this.startProgressTracking();
+            }
+
+            extractVideoId(embedUrl) {
+                const match = embedUrl.match(/\/embed\/([^?]+)/);
+                return match ? match[1] : null;
+            }
+
+            // --- Guessing ---
+
+            submitGuess() {
+                const titleInput = document.getElementById('title-guess-input');
+                const artistInput = document.getElementById('artist-guess-input');
+
+                const guessData = {
+                    title_guess: this.titleCorrect ? '' : titleInput.value.trim(),
+                    artist_guess: this.artistCorrect ? '' : artistInput.value.trim(),
+                };
+
+                if (!guessData.title_guess && !guessData.artist_guess) return;
+
+                // Track guesses for display and filtering
+                if (guessData.title_guess) {
+                    this.titleGuesses.push(guessData.title_guess);
+                    this.renderPastGuesses('title-past-guesses', this.titleGuesses);
+                    titleInput.value = '';
+                }
+                if (guessData.artist_guess) {
+                    this.artistGuesses.push(guessData.artist_guess);
+                    this.renderPastGuesses('artist-past-guesses', this.artistGuesses);
+                    artistInput.value = '';
+                }
+
+                this.sendMessage('submit_guess', guessData);
+            }
+
+            renderPastGuesses(containerId, guesses) {
+                const container = document.getElementById(containerId);
+                container.innerHTML = guesses.map(g =>
+                    `<span class="past-guess-tag">${g}</span>`
+                ).join('');
+            }
+
+            updatePlayersGuessStatus(data) {
+                // Show notification that a player guessed
+                if (data.user_id === this.getCurrentUserId()) {
+                    // Update own status
+                    if (data.title_correct && !this.titleCorrect) {
+                        this.titleCorrect = true;
+                        const titleStatus = document.getElementById('title-guess-status');
+                        titleStatus.textContent = 'Correct!';
+                        titleStatus.className = 'guess-status correct';
+                        document.getElementById('title-guess-input').disabled = true;
+                    }
+                    if (data.artist_correct && !this.artistCorrect) {
+                        this.artistCorrect = true;
+                        const artistStatus = document.getElementById('artist-guess-status');
+                        artistStatus.textContent = 'Correct!';
+                        artistStatus.className = 'guess-status correct';
+                        document.getElementById('artist-guess-input').disabled = true;
+                    }
+                    if (this.checkAllCorrect()) {
+                        document.getElementById('submit-guess-btn').disabled = true;
+                        document.getElementById('submit-guess-btn').textContent = 'All Correct!';
+                    }
+                }
+            }
+
+            updateAllPlayersGuessStatus(round) {
+                const container = document.getElementById('players-guess-status');
+                container.innerHTML = '';
+
+                if (!round.user_guesses) return;
+
+                round.user_guesses.forEach(guess => {
+                    const badge = document.createElement('span');
+                    let cssClass = 'player-guess-badge';
+                    let text = guess.username;
+
+                    if (guess.title_correct && guess.artist_correct) {
+                        cssClass += ' all-correct';
+                        text += ' - All Correct';
+                    } else if (guess.title_correct) {
+                        cssClass += ' title-correct';
+                        text += ' - Title';
+                    } else if (guess.artist_correct) {
+                        cssClass += ' artist-correct';
+                        text += ' - Artist';
+                    }
+
+                    badge.className = cssClass;
+                    badge.textContent = text;
+                    container.appendChild(badge);
+                });
+            }
+
+            // --- Results ---
+
+            showRoundResults(round) {
+                const resultsArea = document.getElementById('results-area');
+                if (!round.song) return;
+
+                const song = round.song;
+                const artistNames = song.artists ?
+                    song.artists.map(a => a.name_english || a.name_original).join(', ') : 'Unknown';
+                const unitNames = song.units ?
+                    song.units.map(u => u.name_english || u.name_original).join(', ') : '';
+
+                let html = `
+                    <h3>Round ${round.round_number} Results</h3>
+                    <div class="results-song-info">
+                        <img src="${song.thumbnail_url}" alt="Thumbnail" class="results-thumbnail" />
+                        <div class="results-song-details">
+                            <h3>${song.title_original}</h3>
+                            ${song.title_english ? `<p>${song.title_english}</p>` : ''}
+                            <p>Artist(s): ${artistNames}</p>
+                            ${unitNames ? `<p>Group(s): ${unitNames}</p>` : ''}
+                            ${song.category_name ? `<p>Category: ${song.category_name}</p>` : ''}
+                            <p>Average Rating: ${song.average_rating ? song.average_rating.toFixed(1) : 'N/A'}</p>
+                        </div>
+                    </div>
+                `;
+
+                // Guesses table
+                if (round.user_guesses && round.user_guesses.length > 0) {
+                    html += `<div class="results-guesses"><h4>Guesses</h4>`;
+                    const qt = this.quizState.question_type;
+                    round.user_guesses.forEach(guess => {
+                        let marks = '';
+                        if (qt === 'title' || qt === 'both') {
+                            marks += guess.title_correct ? '<span class="correct-mark">Title ✓</span>' : '<span class="incorrect-mark">Title ✗</span>';
+                        }
+                        if (qt === 'artist' || qt === 'both') {
+                            marks += guess.artist_correct ? '<span class="correct-mark">Artist ✓</span>' : '<span class="incorrect-mark">Artist ✗</span>';
+                        }
+                        html += `
+                            <div class="result-guess-entry">
+                                <span>${guess.username}</span>
+                                <span>${marks}</span>
+                                <span class="points">+${guess.total_points} pts</span>
+                            </div>
+                        `;
+                    });
+                    html += `</div>`;
+                }
+
+                // Video embed
+                if (song.embed_url) {
+                    html += `
+                        <div class="results-video">
+                            <iframe src="${song.embed_url}?autoplay=0" allowfullscreen></iframe>
+                        </div>
+                    `;
+                }
+
+                // Vote/rating section
+                html += this.buildVotingSection(song);
+
+                resultsArea.innerHTML = html;
+
+                // Bind voting events
+                this.bindVotingEvents(song);
+            }
+
+            buildVotingSection(song) {
+                const currentUserId = this.getCurrentUserId();
+                const songVotes = this.existingVotes[song.song_id] || [];
+                const userVote = songVotes.find(v => v.user_id === currentUserId);
+
+                let html = `
+                    <div class="results-rating-section">
+                        <button class="spoiler-btn" onclick="document.getElementById('quiz-vote-form').style.display = document.getElementById('quiz-vote-form').style.display === 'none' ? 'block' : 'none'">
+                            ${userVote ? 'Update Your Rating' : 'Rate This Song'}
+                        </button>
+                        <div id="quiz-vote-form" style="display: none; margin-top: 10px;">
+                            <label for="quiz-rating">Your Rating:</label>
+                            <select id="quiz-rating" class="form-select" style="width: 100%; padding: 8px; margin-top: 5px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary);">
+                                <option value="">Not rated</option>
+                                <option value="1">1 - Terrible</option>
+                                <option value="2">2 - Very Bad</option>
+                                <option value="3">3 - Bad</option>
+                                <option value="4">4 - Below Average</option>
+                                <option value="5">5 - Average</option>
+                                <option value="6">6 - Above Average</option>
+                                <option value="7">7 - Good</option>
+                                <option value="8">8 - Very Good</option>
+                                <option value="9">9 - Excellent</option>
+                                <option value="10">10 - Perfect</option>
+                            </select>
+                            <button id="quiz-vote-btn" class="btn-secondary" style="margin-top: 10px; width: 100%; padding: 8px; border-radius: 6px; cursor: pointer;">
+                                ${userVote ? 'Update Vote' : 'Submit Vote'}
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                return html;
+            }
+
+            bindVotingEvents(song) {
+                const voteBtn = document.getElementById('quiz-vote-btn');
+                const ratingSelect = document.getElementById('quiz-rating');
+
+                if (!voteBtn || !ratingSelect) return;
+
+                // Restore existing vote
+                const currentUserId = this.getCurrentUserId();
+                const songVotes = this.existingVotes[song.song_id] || [];
+                const userVote = songVotes.find(v => v.user_id === currentUserId);
+                if (userVote) {
+                    ratingSelect.value = userVote.rating;
+                }
+
+                voteBtn.addEventListener('click', async () => {
+                    const rating = ratingSelect.value;
+                    if (!rating) {
+                        alert('Please select a rating');
+                        return;
+                    }
+
+                    voteBtn.disabled = true;
+                    voteBtn.textContent = 'Submitting...';
+
+                    try {
+                        const response = await fetch(`/songs/${song.song_id}/vote`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                            body: `rating=${rating}&comment=`
+                        });
+
+                        if (response.ok) {
+                            voteBtn.textContent = 'Vote Submitted!';
+                            setTimeout(() => {
+                                voteBtn.textContent = 'Update Vote';
+                                voteBtn.disabled = false;
+                            }, 2000);
+
+                            const voteData = {
+                                user_id: currentUserId,
+                                username: '{{.username}}',
+                                song_id: song.song_id,
+                                rating: parseInt(rating),
+                                comment: ''
+                            };
+                            this.sendMessage('vote_update', voteData);
+
+                            if (!this.existingVotes[song.song_id]) {
+                                this.existingVotes[song.song_id] = [];
+                            }
+                            this.existingVotes[song.song_id] = this.existingVotes[song.song_id].filter(
+                                v => v.user_id !== currentUserId
+                            );
+                            this.existingVotes[song.song_id].push(voteData);
+                        } else {
+                            alert('Failed to submit vote');
+                            voteBtn.textContent = 'Submit Vote';
+                            voteBtn.disabled = false;
+                        }
+                    } catch (error) {
+                        alert('Failed to submit vote');
+                        voteBtn.textContent = 'Submit Vote';
+                        voteBtn.disabled = false;
+                    }
+                });
+            }
+
+            getCurrentUserId() {
+                return '{{.user_id}}';
+            }
+        }
+
+        // Initialize
+        const quizRoom = new QuizRoom('{{.room_id}}');
+    </script>
+</body>
+</html>
+{{end}}

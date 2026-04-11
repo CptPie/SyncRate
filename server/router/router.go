@@ -83,6 +83,12 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	r.GET("/tournament-room/:roomId", handlers.GetTournamentRoom(db))
 	r.GET("/tournament-room/:roomId/ws", handlers.GetTournamentRoomWS(db))
 
+	// Quiz room routes
+	r.GET("/create-quiz-room", handlers.GetCreateQuizRoom(db))
+	r.POST("/create-quiz-room", handlers.PostCreateQuizRoom(db))
+	r.GET("/quiz-room/:roomId", handlers.GetQuizRoom(db))
+	r.GET("/quiz-room/:roomId/ws", handlers.GetQuizRoomWS(db))
+
 	// API routes
 	api := r.Group("/api")
 	{

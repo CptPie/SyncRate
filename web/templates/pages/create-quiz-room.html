@@ -1,0 +1,341 @@
+{{define "create-quiz-room.html"}}
+<!doctype html>
+<html lang="en">
+  <head>
+    {{template "head" .}}
+  </head>
+  <body>
+    <div class="container">
+      {{template "header" .}}
+      <main>
+        <div class="form-container">
+          <h2>Create Quiz Room</h2>
+          <p>
+            Test your music knowledge! Listen to audio clips and guess the song
+            title and/or artist.
+          </p>
+
+          <div class="room-info">
+            <h3>How it works:</h3>
+            <ul>
+              <li>A random audio clip plays from a song in the database</li>
+              <li>Guess the song title and/or artist depending on settings</li>
+              <li>
+                In progressive mode, clips get longer if you don't guess
+                correctly
+              </li>
+              <li>Earn points for correct guesses - earlier = more points!</li>
+              <li>Rate songs after each round is completed</li>
+            </ul>
+          </div>
+
+          <div class="filter-section">
+            <h3>Quiz Settings</h3>
+
+            <div class="form-group">
+              <label for="quiz-mode">Quiz Mode:</label>
+              <select id="quiz-mode" class="filter-select" required>
+                <option value="endless" selected>Endless</option>
+                <option value="5">5 Rounds</option>
+                <option value="10">10 Rounds</option>
+                <option value="15">15 Rounds</option>
+                <option value="20">20 Rounds</option>
+              </select>
+              <p class="checkbox-description">
+                Number of rounds to play (endless keeps going until the room is
+                closed)
+              </p>
+            </div>
+
+            <div class="form-group">
+              <label for="question-type">Question Type:</label>
+              <select id="question-type" class="filter-select" required>
+                <option value="both" selected>Both (Title + Artist)</option>
+                <option value="title">Song Title Only</option>
+                <option value="artist">Artist Only</option>
+              </select>
+              <p class="checkbox-description">What players need to guess</p>
+            </div>
+
+            <div class="form-group">
+              <label for="quiz-style">Quiz Style:</label>
+              <select id="quiz-style" class="filter-select" required>
+                <option value="progressive" selected>
+                  Progressive (1s &rarr; 5s &rarr; 10s &rarr; 30s &rarr; 1min)
+                </option>
+                <option value="fixed">Fixed Length</option>
+              </select>
+              <p class="checkbox-description">
+                Progressive gives shorter clips first with more points;
+                fixed plays one clip of set length
+              </p>
+            </div>
+
+            <div class="form-group" id="fixed-time-group" style="display: none">
+              <label for="fixed-time-limit">Clip Length:</label>
+              <select id="fixed-time-limit" class="filter-select">
+                <option value="1">1 second</option>
+                <option value="5">5 seconds</option>
+                <option value="10">10 seconds</option>
+                <option value="30" selected>30 seconds</option>
+                <option value="60">1 minute</option>
+              </select>
+              <p class="checkbox-description">
+                Length of the audio clip in fixed mode
+              </p>
+            </div>
+
+            <div class="form-group">
+              <label for="category-filter">Category Filter:</label>
+              <select id="category-filter" class="filter-select">
+                <option value="">All Categories</option>
+                {{range .categories}}
+                <option value="{{.CategoryID}}">{{.Name}}</option>
+                {{end}}
+              </select>
+              <p class="checkbox-description">
+                Only include songs from a specific category
+              </p>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="voted-only-filter" />
+                <span>Voted Songs Only</span>
+              </label>
+              <p class="checkbox-description">
+                Only include songs you have already voted on
+              </p>
+            </div>
+
+            <div class="form-group" id="voted-ratio-group">
+              <label for="voted-ratio">Voted/Unvoted Ratio:</label>
+              <select id="voted-ratio" class="filter-select">
+                <option value="0.0">All Unvoted</option>
+                <option value="0.25">25% Voted / 75% Unvoted</option>
+                <option value="0.5" selected>50% Voted / 50% Unvoted</option>
+                <option value="0.75">75% Voted / 25% Unvoted</option>
+                <option value="1.0">All Voted</option>
+              </select>
+              <p class="checkbox-description">
+                Ratio of voted vs unvoted songs to include
+              </p>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="covers-only-filter" />
+                <span>Covers Only</span>
+              </label>
+              <p class="checkbox-description">Only include cover songs</p>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="fuzzy-input" checked />
+                <span>Fuzzy Search Input</span>
+              </label>
+              <p class="checkbox-description">
+                Use dropdown search to select answers (disable for free text
+                input with typo tolerance)
+              </p>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="one-of-artists" checked />
+                <span>One of the Artists</span>
+              </label>
+              <p class="checkbox-description">
+                Count as correct if at least one artist (or their group) is
+                guessed correctly
+              </p>
+            </div>
+          </div>
+
+          <button id="create-room-btn" class="btn-primary">Create Quiz</button>
+
+          <div
+            id="warning-message"
+            class="warning-message"
+            style="display: none; margin-top: 15px"
+          ></div>
+
+          <div id="room-result" class="room-result" style="display: none">
+            <h3>Quiz Room Created!</h3>
+            <div class="room-details">
+              <div class="room-code-section">
+                <label>Room Code:</label>
+                <div class="room-code" id="room-code"></div>
+                <button id="copy-code-btn" class="btn-secondary">
+                  Copy Code
+                </button>
+              </div>
+              <div class="room-url-section">
+                <label>Share URL:</label>
+                <div class="room-url" id="room-url"></div>
+                <button id="copy-url-btn" class="btn-secondary">
+                  Copy URL
+                </button>
+              </div>
+              <a id="join-room-link" class="btn-primary">Enter Quiz Room</a>
+            </div>
+          </div>
+          <div
+            id="error-message"
+            class="error-message"
+            style="display: none"
+          ></div>
+        </div>
+      </main>
+    </div>
+
+    <script src="/static/js/theme-toggle.js"></script>
+    <script>
+      // Toggle fixed time group visibility
+      document
+        .getElementById("quiz-style")
+        .addEventListener("change", function () {
+          const fixedTimeGroup = document.getElementById("fixed-time-group");
+          fixedTimeGroup.style.display =
+            this.value === "fixed" ? "block" : "none";
+        });
+
+      // Toggle voted ratio visibility
+      document
+        .getElementById("voted-only-filter")
+        .addEventListener("change", function () {
+          const votedRatioGroup = document.getElementById("voted-ratio-group");
+          votedRatioGroup.style.display = this.checked ? "none" : "block";
+        });
+
+      document
+        .getElementById("create-room-btn")
+        .addEventListener("click", async function () {
+          const btn = this;
+          btn.disabled = true;
+          btn.textContent = "Creating Quiz...";
+
+          const quizMode = document.getElementById("quiz-mode").value;
+          const questionType = document.getElementById("question-type").value;
+          const quizStyle = document.getElementById("quiz-style").value;
+          const fixedTimeLimit = parseInt(
+            document.getElementById("fixed-time-limit").value,
+          );
+          const categoryId = document.getElementById("category-filter").value;
+          const votedOnly =
+            document.getElementById("voted-only-filter").checked;
+          const votedRatio = parseFloat(
+            document.getElementById("voted-ratio").value,
+          );
+          const coversOnly =
+            document.getElementById("covers-only-filter").checked;
+          const fuzzyInput = document.getElementById("fuzzy-input").checked;
+          const oneOfArtists =
+            document.getElementById("one-of-artists").checked;
+
+          const requestBody = {
+            question_type: questionType,
+            quiz_style: quizStyle,
+            fixed_time_limit: fixedTimeLimit,
+            covers_only: coversOnly,
+            fuzzy_input: fuzzyInput,
+            one_of_artists: oneOfArtists,
+          };
+
+          if (quizMode !== "endless") {
+            requestBody.max_rounds = parseInt(quizMode);
+          }
+
+          if (categoryId) {
+            requestBody.category_id = parseInt(categoryId);
+          }
+
+          if (votedOnly) {
+            requestBody.voted_only = true;
+          } else {
+            requestBody.voted_ratio = votedRatio;
+          }
+
+          try {
+            const response = await fetch("/create-quiz-room", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(requestBody),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+              document.getElementById("room-code").textContent = data.room_id;
+              document.getElementById("room-url").textContent =
+                window.location.origin + data.url;
+              document.getElementById("join-room-link").href = data.url;
+              document.getElementById("room-result").style.display = "block";
+              document.getElementById("error-message").style.display = "none";
+
+              const warningEl = document.getElementById("warning-message");
+              if (data.warning) {
+                warningEl.textContent = data.warning;
+                warningEl.style.display = "block";
+              } else {
+                warningEl.style.display = "none";
+              }
+            } else {
+              document.getElementById("error-message").textContent =
+                data.error || "Failed to create quiz room";
+              document.getElementById("error-message").style.display = "block";
+              document.getElementById("room-result").style.display = "none";
+            }
+          } catch (error) {
+            document.getElementById("error-message").textContent =
+              "Network error occurred";
+            document.getElementById("error-message").style.display = "block";
+            document.getElementById("room-result").style.display = "none";
+          }
+
+          btn.disabled = false;
+          btn.textContent = "Create Quiz";
+        });
+
+      // Copy functionality
+      function copyRoomCode() {
+        const roomCode = document.getElementById("room-code").textContent;
+        navigator.clipboard.writeText(roomCode).then(() => {
+          const btn = document.getElementById("copy-code-btn");
+          btn.textContent = "Copied!";
+          setTimeout(() => {
+            btn.textContent = "Copy Code";
+          }, 2000);
+        });
+      }
+
+      function copyRoomUrl() {
+        const roomUrl = document.getElementById("room-url").textContent;
+        navigator.clipboard.writeText(roomUrl).then(() => {
+          const btn = document.getElementById("copy-url-btn");
+          btn.textContent = "Copied!";
+          setTimeout(() => {
+            btn.textContent = "Copy URL";
+          }, 2000);
+        });
+      }
+
+      document
+        .getElementById("copy-code-btn")
+        .addEventListener("click", copyRoomCode);
+      document
+        .getElementById("copy-url-btn")
+        .addEventListener("click", copyRoomUrl);
+      document
+        .getElementById("room-code")
+        .addEventListener("click", copyRoomCode);
+      document
+        .getElementById("room-url")
+        .addEventListener("click", copyRoomUrl);
+    </script>
+  </body>
+</html>
+{{end}}
