@@ -1500,13 +1500,41 @@ input[type="color"]:focus {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 20px;
+  gap: 10px;
   margin-top: 30px;
   padding: 20px;
+  flex-wrap: wrap;
 }
 
 .pagination-controls button {
   min-width: 100px;
+}
+
+.pagination-controls .pagination-btn-sm {
+  min-width: 40px;
+  padding: 8px 10px;
+  font-weight: bold;
+}
+
+.page-input {
+  width: 60px;
+  padding: 8px;
+  text-align: center;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.page-input::-webkit-inner-spin-button,
+.page-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.page-input {
+  -moz-appearance: textfield;
 }
 
 #page-info {

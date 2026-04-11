@@ -70,6 +70,35 @@ class SearchFilter {
         if (nextButton) {
             nextButton.addEventListener('click', () => this.nextPage());
         }
+
+        const firstButton = document.getElementById('first-page');
+        const lastButton = document.getElementById('last-page');
+        const back5Button = document.getElementById('back-5-page');
+        const forward5Button = document.getElementById('forward-5-page');
+        const pageInput = document.getElementById('page-input');
+
+        if (firstButton) {
+            firstButton.addEventListener('click', () => this.goToPage(1));
+        }
+        if (lastButton) {
+            lastButton.addEventListener('click', () => this.goToPage(this.totalPages));
+        }
+        if (back5Button) {
+            back5Button.addEventListener('click', () => this.goToPage(this.currentPage - 5));
+        }
+        if (forward5Button) {
+            forward5Button.addEventListener('click', () => this.goToPage(this.currentPage + 5));
+        }
+        if (pageInput) {
+            pageInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    const page = parseInt(pageInput.value);
+                    if (!isNaN(page)) {
+                        this.goToPage(page);
+                    }
+                }
+            });
+        }
     }
 
     populateCategoryFilter() {
@@ -128,6 +157,16 @@ class SearchFilter {
         }
     }
 
+    goToPage(page) {
+        const p = Math.max(1, Math.min(page, this.totalPages));
+        if (p !== this.currentPage) {
+            this.currentPage = p;
+            this.renderItems();
+            this.updatePaginationControls();
+            this.scrollToTop();
+        }
+    }
+
     scrollToTop() {
         const container = document.getElementById(this.itemsContainerId);
         if (container) {
@@ -138,14 +177,26 @@ class SearchFilter {
     updatePaginationControls() {
         const prevButton = document.getElementById('prev-page');
         const nextButton = document.getElementById('next-page');
+        const firstButton = document.getElementById('first-page');
+        const lastButton = document.getElementById('last-page');
+        const back5Button = document.getElementById('back-5-page');
+        const forward5Button = document.getElementById('forward-5-page');
         const pageInfo = document.getElementById('page-info');
+        const pageInput = document.getElementById('page-input');
 
-        if (prevButton) {
-            prevButton.disabled = this.currentPage <= 1;
-        }
+        const atFirst = this.currentPage <= 1;
+        const atLast = this.currentPage >= this.totalPages;
 
-        if (nextButton) {
-            nextButton.disabled = this.currentPage >= this.totalPages;
+        if (prevButton) prevButton.disabled = atFirst;
+        if (nextButton) nextButton.disabled = atLast;
+        if (firstButton) firstButton.disabled = atFirst;
+        if (lastButton) lastButton.disabled = atLast;
+        if (back5Button) back5Button.disabled = this.currentPage <= 5;
+        if (forward5Button) forward5Button.disabled = this.currentPage + 5 > this.totalPages;
+
+        if (pageInput) {
+            pageInput.value = this.currentPage;
+            pageInput.max = this.totalPages;
         }
 
         if (pageInfo) {

@@ -18,9 +18,14 @@
         </div>
 
         <div class="pagination-controls">
+          <button id="first-page" class="btn-secondary pagination-btn-sm" title="First page">«</button>
+          <button id="back-5-page" class="btn-secondary pagination-btn-sm" title="Back 5 pages">-5</button>
           <button id="prev-page" class="btn-secondary">Previous</button>
           <span id="page-info"></span>
+          <input type="number" id="page-input" class="page-input" min="1" value="1" title="Jump to page">
           <button id="next-page" class="btn-secondary">Next</button>
+          <button id="forward-5-page" class="btn-secondary pagination-btn-sm" title="Forward 5 pages">+5</button>
+          <button id="last-page" class="btn-secondary pagination-btn-sm" title="Last page">»</button>
         </div>
         {{else}}
         <p>No songs available yet.</p>
