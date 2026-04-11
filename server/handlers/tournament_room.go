@@ -8,6 +8,7 @@ import (
 	"math"
 	mathrand "math/rand"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/CptPie/SyncRate/models"
@@ -110,7 +111,7 @@ func PostCreateTournamentRoom(db *gorm.DB) gin.HandlerFunc {
 		roomID := generateTournamentRoomCode()
 
 		// Select songs for the tournament
-		songs, err := selectTournamentSongs(db, userID.(uint), requestBody.TreeSize, requestBody.CategoryID, requestBody.VotedOnly, requestBody.VotedRatio, requestBody.CoversOnly)
+		songs, songWarning, err := selectTournamentSongs(db, userID.(uint), requestBody.TreeSize, requestBody.CategoryID, requestBody.VotedOnly, requestBody.VotedRatio, requestBody.CoversOnly)
 		if err != nil {
 			log.Printf("Error selecting tournament songs: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to select songs: %v", err)})
@@ -157,15 +158,19 @@ func PostCreateTournamentRoom(db *gorm.DB) gin.HandlerFunc {
 		// Create room in memory
 		tournamentRoomManager.CreateRoom(roomID, fmt.Sprintf("%d", userID.(uint)), usernameStr)
 
-		c.JSON(http.StatusOK, gin.H{
+		response := gin.H{
 			"room_id": roomID,
 			"url":     fmt.Sprintf("/tournament-room/%s", roomID),
-		})
+		}
+		if songWarning != "" {
+			response["warning"] = songWarning
+		}
+		c.JSON(http.StatusOK, response)
 	}
 }
 
 // selectTournamentSongs selects songs for the tournament based on filters
-func selectTournamentSongs(db *gorm.DB, userID uint, count int, categoryID *uint, votedOnly bool, votedRatio *float64, coversOnly bool) ([]models.Song, error) {
+func selectTournamentSongs(db *gorm.DB, userID uint, count int, categoryID *uint, votedOnly bool, votedRatio *float64, coversOnly bool) ([]models.Song, string, error) {
 	var songs []models.Song
 
 	// Build base query
@@ -189,6 +194,7 @@ func selectTournamentSongs(db *gorm.DB, userID uint, count int, categoryID *uint
 			Limit(count).
 			Find(&songs).Error
 
+		warning := ""
 		// If not enough voted songs, fill with unvoted
 		if len(songs) < count {
 			remaining := count - len(songs)
@@ -201,23 +207,28 @@ func selectTournamentSongs(db *gorm.DB, userID uint, count int, categoryID *uint
 				Find(&unvotedSongs)
 
 			songs = append(songs, unvotedSongs...)
+			warning = fmt.Sprintf("Not enough voted songs available (found %d, needed %d). Filled remaining %d slots with unvoted songs.", count-remaining, count, len(unvotedSongs))
 		}
 
-		return songs, err
+		return songs, warning, err
 	}
 
-	// Mix of voted and unvoted songs (best effort)
-	if votedRatio != nil && *votedRatio > 0 && *votedRatio < 1 {
-		votedCount := int(float64(count) * (*votedRatio))
-		unvotedCount := count - votedCount
+	// Determine voted/unvoted split
+	ratio := 0.5 // default
+	if votedRatio != nil {
+		ratio = *votedRatio
+	}
 
-		// Get voted songs (up to desired count)
-		var votedSongs []models.Song
+	votedCount := int(float64(count) * ratio)
+	unvotedCount := count - votedCount
+
+	// Get voted songs (up to desired count)
+	var votedSongs []models.Song
+	if votedCount > 0 {
 		votedQuery := db.Model(&models.Song{}).
 			Preload("Artists").Preload("Units").Preload("Category").
 			Joins("INNER JOIN votes ON votes.song_id = songs.song_id AND votes.user_id = ?", userID)
 
-		// Apply same filters to voted query
 		if categoryID != nil {
 			votedQuery = votedQuery.Where("songs.category_id = ?", *categoryID)
 		}
@@ -226,60 +237,70 @@ func selectTournamentSongs(db *gorm.DB, userID uint, count int, categoryID *uint
 		}
 
 		votedQuery.Order("RANDOM()").Limit(votedCount).Find(&votedSongs)
+	}
 
-		// Get unvoted songs (up to desired count)
-		var unvotedSongs []models.Song
+	// Get unvoted songs (up to desired count)
+	var unvotedSongs []models.Song
+	if unvotedCount > 0 {
 		unvotedQuery := db.Model(&models.Song{}).
 			Preload("Artists").Preload("Units").Preload("Category").
-			Where("song_id NOT IN (?)", db.Table("votes").Select("song_id").Where("user_id = ?", userID))
+			Where("songs.song_id NOT IN (?)", db.Table("votes").Select("song_id").Where("user_id = ?", userID))
 
-		// Apply same filters to unvoted query
 		if categoryID != nil {
-			unvotedQuery = unvotedQuery.Where("category_id = ?", *categoryID)
+			unvotedQuery = unvotedQuery.Where("songs.category_id = ?", *categoryID)
 		}
 		if coversOnly {
-			unvotedQuery = unvotedQuery.Where("is_cover = ?", true)
+			unvotedQuery = unvotedQuery.Where("songs.is_cover = ?", true)
 		}
 
 		unvotedQuery.Order("RANDOM()").Limit(unvotedCount).Find(&unvotedSongs)
-
-		// Combine what we found
-		songs = append(votedSongs, unvotedSongs...)
-
-		// If we don't have enough songs yet, fill with whatever is available
-		if len(songs) < count {
-			remaining := count - len(songs)
-
-			// Get song IDs we already have
-			existingIDs := make([]uint, len(songs))
-			for i, s := range songs {
-				existingIDs[i] = s.SongID
-			}
-
-			// Get more songs that we haven't selected yet
-			var additionalSongs []models.Song
-			fillQuery := db.Model(&models.Song{}).
-				Preload("Artists").Preload("Units").Preload("Category").
-				Where("song_id NOT IN (?)", existingIDs)
-
-			// Apply same filters
-			if categoryID != nil {
-				fillQuery = fillQuery.Where("category_id = ?", *categoryID)
-			}
-			if coversOnly {
-				fillQuery = fillQuery.Where("is_cover = ?", true)
-			}
-
-			fillQuery.Order("RANDOM()").Limit(remaining).Find(&additionalSongs)
-			songs = append(songs, additionalSongs...)
-		}
-
-		return songs, nil
 	}
 
-	// All songs (no ratio preference)
-	err := baseQuery.Order("RANDOM()").Limit(count).Find(&songs).Error
-	return songs, err
+	// Combine what we found
+	songs = append(votedSongs, unvotedSongs...)
+
+	// Build warning if either side fell short
+	var warningParts []string
+	if votedCount > 0 && len(votedSongs) < votedCount {
+		warningParts = append(warningParts, fmt.Sprintf("voted songs: found %d of %d requested", len(votedSongs), votedCount))
+	}
+	if unvotedCount > 0 && len(unvotedSongs) < unvotedCount {
+		warningParts = append(warningParts, fmt.Sprintf("unvoted songs: found %d of %d requested", len(unvotedSongs), unvotedCount))
+	}
+
+	// If we don't have enough songs yet, fill with whatever is available
+	if len(songs) < count {
+		remaining := count - len(songs)
+
+		existingIDs := make([]uint, len(songs))
+		for i, s := range songs {
+			existingIDs[i] = s.SongID
+		}
+
+		var additionalSongs []models.Song
+		fillQuery := db.Model(&models.Song{}).
+			Preload("Artists").Preload("Units").Preload("Category")
+
+		if len(existingIDs) > 0 {
+			fillQuery = fillQuery.Where("song_id NOT IN (?)", existingIDs)
+		}
+		if categoryID != nil {
+			fillQuery = fillQuery.Where("category_id = ?", *categoryID)
+		}
+		if coversOnly {
+			fillQuery = fillQuery.Where("is_cover = ?", true)
+		}
+
+		fillQuery.Order("RANDOM()").Limit(remaining).Find(&additionalSongs)
+		songs = append(songs, additionalSongs...)
+	}
+
+	warning := ""
+	if len(warningParts) > 0 {
+		warning = "Not enough songs for requested ratio. Shortfall in " + strings.Join(warningParts, "; ") + ". Remaining slots were filled automatically."
+	}
+
+	return songs, warning, nil
 }
 
 // generateTournamentTree creates the tournament bracket structure
@@ -596,6 +617,10 @@ func handleTournamentMessage(db *gorm.DB, roomID, userID string, msg wsocket.WSM
 		handleStartMatch(db, roomID, msg.Data)
 	case "pick_winner":
 		handlePickWinner(db, roomID, userID, msg.Data)
+	case "remove_pick":
+		handleRemovePick(db, roomID, userID, msg.Data)
+	case "complete_match":
+		handleCompleteMatch(db, roomID, msg.Data)
 	case "navigate_match":
 		// Broadcast match navigation to all clients for synchronized navigation
 		tournamentRoomManager.BroadcastToRoom(roomID, msg)
@@ -688,15 +713,19 @@ func handlePickWinner(db *gorm.DB, roomID string, userID string, data json.RawMe
 	if exists {
 		username = client.Username
 	}
-	totalUsers := len(tournRoom.Clients)
 	tournRoom.Mutex.RUnlock()
 
-	// Add or update user's pick
-	pickedSongID := pickData.SongID
+	// Add or update user's pick (song_id 0 = abstain)
+	var pickedSongID *uint
+	if pickData.SongID != 0 {
+		id := pickData.SongID
+		pickedSongID = &id
+	}
+
 	pickExists := false
 	for i, pick := range match.UserPicks {
 		if pick.UserID == userID {
-			match.UserPicks[i].PickedSongID = &pickedSongID
+			match.UserPicks[i].PickedSongID = pickedSongID
 			match.UserPicks[i].PickedAt = time.Now()
 			pickExists = true
 			break
@@ -707,54 +736,124 @@ func handlePickWinner(db *gorm.DB, roomID string, userID string, data json.RawMe
 		match.UserPicks = append(match.UserPicks, models.UserPick{
 			UserID:       userID,
 			Username:     username,
-			PickedSongID: &pickedSongID,
+			PickedSongID: pickedSongID,
 			PickedAt:     time.Now(),
 		})
 	}
 
-	// Check if all users have picked
-	matchCompleted := false
-	if len(match.UserPicks) >= totalUsers {
-		// Update average ratings with current values from database before determining winner
-		if match.Song1 != nil && match.Song1.SongID != nil {
-			match.Song1.AverageRating = getAverageSongRatingFromDB(db, *match.Song1.SongID)
-		}
-		if match.Song2 != nil && match.Song2.SongID != nil {
-			match.Song2.AverageRating = getAverageSongRatingFromDB(db, *match.Song2.SongID)
-		}
+	// Save updated tree state
+	db.Model(&models.TournamentRoom{}).
+		Where("room_id = ?", roomID).
+		Updates(map[string]interface{}{
+			"tree_state":  room.TreeState,
+			"last_active": time.Now(),
+		})
 
-		// Determine winner (pass db to recalculate ratings)
-		winner := determineMatchWinner(db, match)
-		match.Winner = winner
-		match.Status = "completed"
-		now := time.Now()
-		match.CompletedAt = &now
-		matchCompleted = true
+	// Broadcast updated state
+	broadcastTournamentState(db, roomID)
+}
 
-		// Advance winner to next round if applicable
-		advanceWinner(&room.TreeState, pickData.MatchID, winner)
+func handleCompleteMatch(db *gorm.DB, roomID string, data json.RawMessage) {
+	var matchData struct {
+		MatchID string `json:"match_id"`
 	}
 
-	// Prepare update map
+	if err := json.Unmarshal(data, &matchData); err != nil {
+		log.Printf("Error unmarshaling complete match data: %v", err)
+		return
+	}
+
+	var room models.TournamentRoom
+	if err := db.Where("room_id = ?", roomID).First(&room).Error; err != nil {
+		log.Printf("Error finding tournament room: %v", err)
+		return
+	}
+
+	match := findMatchInTree(&room.TreeState, matchData.MatchID)
+	if match == nil {
+		log.Printf("Match not found: %s", matchData.MatchID)
+		return
+	}
+
+	// Don't re-complete an already completed match
+	if match.Status == "completed" {
+		return
+	}
+
+	// Update average ratings with current values from database before determining winner
+	if match.Song1 != nil && match.Song1.SongID != nil {
+		match.Song1.AverageRating = getAverageSongRatingFromDB(db, *match.Song1.SongID)
+	}
+	if match.Song2 != nil && match.Song2.SongID != nil {
+		match.Song2.AverageRating = getAverageSongRatingFromDB(db, *match.Song2.SongID)
+	}
+
+	// Determine winner
+	winner := determineMatchWinner(db, match)
+	match.Winner = winner
+	match.Status = "completed"
+	now := time.Now()
+	match.CompletedAt = &now
+
+	// Advance winner to next round if applicable
+	advanceWinner(&room.TreeState, matchData.MatchID, winner)
+
+	// Find and set next active match as current
 	updates := map[string]interface{}{
 		"tree_state":  room.TreeState,
 		"last_active": time.Now(),
 	}
-
-	// If match completed, find and set next active match as current
-	if matchCompleted {
-		nextMatchID := findNextActiveMatch(&room.TreeState)
-		if nextMatchID != "" {
-			updates["current_match_id"] = nextMatchID
-		}
+	nextMatchID := findNextActiveMatch(&room.TreeState)
+	if nextMatchID != "" {
+		updates["current_match_id"] = nextMatchID
 	}
 
-	// Save updated tree state and current match
 	db.Model(&models.TournamentRoom{}).
 		Where("room_id = ?", roomID).
 		Updates(updates)
 
-	// Broadcast updated state
+	broadcastTournamentState(db, roomID)
+}
+
+func handleRemovePick(db *gorm.DB, roomID string, userID string, data json.RawMessage) {
+	var pickData struct {
+		MatchID string `json:"match_id"`
+	}
+
+	if err := json.Unmarshal(data, &pickData); err != nil {
+		log.Printf("Error unmarshaling remove pick data: %v", err)
+		return
+	}
+
+	var room models.TournamentRoom
+	if err := db.Where("room_id = ?", roomID).First(&room).Error; err != nil {
+		log.Printf("Error finding tournament room: %v", err)
+		return
+	}
+
+	match := findMatchInTree(&room.TreeState, pickData.MatchID)
+	if match == nil {
+		log.Printf("Match not found: %s", pickData.MatchID)
+		return
+	}
+
+	// Remove the user's pick
+	newPicks := make([]models.UserPick, 0, len(match.UserPicks))
+	for _, pick := range match.UserPicks {
+		if pick.UserID != userID {
+			newPicks = append(newPicks, pick)
+		}
+	}
+	match.UserPicks = newPicks
+
+	// Save updated tree state
+	db.Model(&models.TournamentRoom{}).
+		Where("room_id = ?", roomID).
+		Updates(map[string]interface{}{
+			"tree_state":  room.TreeState,
+			"last_active": time.Now(),
+		})
+
 	broadcastTournamentState(db, roomID)
 }
 

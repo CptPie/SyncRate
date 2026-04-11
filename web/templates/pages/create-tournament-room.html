@@ -105,6 +105,12 @@
             Create Tournament
           </button>
 
+          <div
+            id="warning-message"
+            class="warning-message"
+            style="display: none"
+          ></div>
+
           <div id="room-result" class="room-result" style="display: none">
             <h3>Tournament Created!</h3>
             <div class="room-details">
@@ -125,7 +131,6 @@
               <a id="join-room-link" class="btn-primary">Enter Tournament</a>
             </div>
           </div>
-
           <div
             id="error-message"
             class="error-message"
@@ -201,6 +206,15 @@
               document.getElementById("join-room-link").href = data.url;
               document.getElementById("room-result").style.display = "block";
               document.getElementById("error-message").style.display = "none";
+
+              // Show warning if song ratio couldn't be fully satisfied
+              const warningEl = document.getElementById("warning-message");
+              if (data.warning) {
+                warningEl.textContent = data.warning;
+                warningEl.style.display = "block";
+              } else {
+                warningEl.style.display = "none";
+              }
             } else {
               // Show error
               document.getElementById("error-message").textContent =

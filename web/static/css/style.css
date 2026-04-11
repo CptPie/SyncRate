@@ -1725,6 +1725,23 @@ input[type="color"]:focus {
   --error-border: #553333;
 }
 
+.warning-message {
+  background-color: var(--warning-bg, #fff8e1);
+  color: var(--warning-text, #856404);
+  border: 1px solid var(--warning-border, #ffeeba);
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  display: block;
+}
+
+[data-theme="dark"] .warning-message {
+  --warning-bg: #2d2a1b;
+  --warning-text: #ffc107;
+  --warning-border: #554d33;
+}
+
 .user-info {
   color: var(--text-primary);
   font-weight: 500;
