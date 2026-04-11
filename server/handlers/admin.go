@@ -960,7 +960,7 @@ func GetViewSongs(db *gorm.DB) gin.HandlerFunc {
 		var units []models.Unit
 		var albums []models.Album
 
-		db.Preload("Category").Preload("Artists").Preload("Units").Preload("Albums").Find(&songs)
+		db.Preload("Category").Preload("Artists").Preload("Units").Preload("Albums").Order("song_id").Find(&songs)
 		db.Find(&categories)
 		db.Preload("Category").Find(&artists)
 		db.Preload("Category").Find(&units)
@@ -1300,7 +1300,7 @@ func GetViewAlbums(db *gorm.DB) gin.HandlerFunc {
 
 		var albums []models.Album
 		var categories []models.Category
-		db.Preload("Category").Preload("Songs").Find(&albums)
+		db.Preload("Category").Preload("Songs").Order("album_id").Find(&albums)
 		db.Find(&categories)
 
 		// Convert to JSON for JavaScript

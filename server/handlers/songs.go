@@ -29,7 +29,7 @@ func GetSongs(db *gorm.DB) gin.HandlerFunc {
 		var songs []models.Song
 		var categories []models.Category
 
-		result := db.Preload("Artists").Preload("Units").Preload("Category").Preload("Albums").Find(&songs)
+		result := db.Preload("Artists").Preload("Units").Preload("Category").Preload("Albums").Order("song_id").Find(&songs)
 		if result.Error != nil {
 			log.Printf("GetSongs: Database error: %v", result.Error)
 			c.HTML(http.StatusInternalServerError, "error.html", gin.H{

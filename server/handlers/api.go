@@ -437,7 +437,7 @@ func PostAPIVote(db *gorm.DB) gin.HandlerFunc {
 func GetAPISongs(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var songs []models.Song
-		result := db.Preload("Artists").Preload("Units").Preload("Category").Preload("Albums").Find(&songs)
+		result := db.Preload("Artists").Preload("Units").Preload("Category").Preload("Albums").Order("song_id").Find(&songs)
 		if result.Error != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch songs"})
 			return
@@ -499,7 +499,7 @@ func GetAPIArtist(db *gorm.DB) gin.HandlerFunc {
 func GetAPIAlbums(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var albums []models.Album
-		result := db.Preload("Songs").Preload("Category").Find(&albums)
+		result := db.Preload("Songs").Preload("Category").Order("album_id").Find(&albums)
 		if result.Error != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch albums"})
 			return
