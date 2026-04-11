@@ -1267,6 +1267,16 @@ func PostDeleteSong(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Clear album associations
+		if err := tx.Where("song_id = ?", id).Delete(&models.AlbumSong{}).Error; err != nil {
+			tx.Rollback()
+			log.Printf("PostDeleteSong: Error clearing album associations: %v", err)
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+				"error": "Failed to delete album associations: " + err.Error(),
+			})
+			return
+		}
+
 		// Finally delete the song
 		if err := tx.Delete(&song).Error; err != nil {
 			tx.Rollback()

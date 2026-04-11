@@ -12,6 +12,7 @@ import (
 	"github.com/CptPie/SyncRate/server/utils"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 func GetSongs(db *gorm.DB) gin.HandlerFunc {
@@ -241,7 +242,7 @@ func PostVote(db *gorm.DB) gin.HandlerFunc {
 
 		// Check if user already voted for this song
 		var existingVote models.Vote
-		result := db.Where("user_id = ? AND song_id = ?", userID, uint(songID)).First(&existingVote)
+		result := db.Session(&gorm.Session{Logger: db.Logger.LogMode(logger.Silent)}).Where("user_id = ? AND song_id = ?", userID, uint(songID)).First(&existingVote)
 
 		if result.Error == nil {
 			// Update existing vote
