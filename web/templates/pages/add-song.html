@@ -97,9 +97,24 @@
         const albumsData = JSON.parse('{{.albumsJSON}}');
 
         setupFuzzySearch('category-search', 'category-dropdown', 'selected-category', 'category-id', categoriesData, 'CategoryID', 'Name', true);
-        setupFuzzySearch('artists-search', 'artists-dropdown', 'selected-artists', 'artist-ids', artistsData, 'ArtistID', 'NameOriginal');
-        setupFuzzySearch('units-search', 'units-dropdown', 'selected-units', 'unit-ids', unitsData, 'UnitID', 'NameOriginal');
+        const artistsCtrl = setupFuzzySearch('artists-search', 'artists-dropdown', 'selected-artists', 'artist-ids', artistsData, 'ArtistID', 'NameOriginal');
+        const unitsCtrl = setupFuzzySearch('units-search', 'units-dropdown', 'selected-units', 'unit-ids', unitsData, 'UnitID', 'NameOriginal');
         setupFuzzySearch('albums-search', 'albums-dropdown', 'selected-albums', 'album-ids', albumsData, 'AlbumID', 'NameOriginal');
+
+        // When a unit is selected, auto-populate its member artists
+        const unitsSelectedContainer = document.getElementById('selected-units');
+        const observer = new MutationObserver(() => {
+            const selectedUnitIds = document.getElementById('unit-ids').value.split(',').filter(id => id.trim());
+            selectedUnitIds.forEach(unitId => {
+                const unit = unitsData.find(u => u.UnitID.toString() === unitId);
+                if (unit && unit.Artists) {
+                    unit.Artists.forEach(artist => {
+                        artistsCtrl.addItem(artist.ArtistID, artist.NameOriginal);
+                    });
+                }
+            });
+        });
+        observer.observe(unitsSelectedContainer, { childList: true });
     </script>
 </body>
 </html>

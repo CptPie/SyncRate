@@ -120,7 +120,7 @@ func GetAddSong(db *gorm.DB) gin.HandlerFunc {
 		var albums []models.Album
 		db.Find(&categories)
 		db.Find(&artists)
-		db.Find(&units)
+		db.Preload("Artists").Find(&units)
 		db.Preload("Category").Find(&albums)
 
 		// Convert to JSON for JavaScript

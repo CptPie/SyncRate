@@ -200,4 +200,18 @@ function setupFuzzySearch(inputId, dropdownId, selectedId, hiddenInputId, data, 
 
     // Render any existing selections on initialization
     renderSelectedItems();
+
+    // Return controller for programmatic access
+    return {
+        addItem(id, name) {
+            if (selectedItems.some(s => s.id === id)) return;
+            if (singleSelect) {
+                selectedItems = [{ id, name }];
+            } else {
+                selectedItems.push({ id, name });
+            }
+            renderSelectedItems();
+            updateHiddenInput();
+        }
+    };
 }
