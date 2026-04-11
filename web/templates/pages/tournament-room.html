@@ -166,6 +166,16 @@
             margin-top: 4px;
             opacity: 0.8;
         }
+        .vote-check {
+            font-size: 14px;
+            color: var(--accent-secondary, #4caf50);
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+        .vote-check.unvoted {
+            color: var(--text-secondary);
+            opacity: 0.4;
+        }
         .match-modal {
             display: none;
             position: fixed;
@@ -220,8 +230,24 @@
             border-radius: 4px;
             margin-bottom: 15px;
         }
-        .competitor-info h3 {
+        .competitor-info-header {
+            display: flex;
+            align-items: center;
             margin-bottom: 10px;
+        }
+        .competitor-info-header h3 {
+            margin: 0;
+            flex: 1;
+        }
+        .modal-vote-check {
+            font-size: 18px;
+            color: var(--accent-secondary, #4caf50);
+            flex-shrink: 0;
+            margin-left: 10px;
+        }
+        .modal-vote-check.unvoted {
+            color: var(--text-secondary);
+            opacity: 0.4;
         }
         .competitor-vote {
             margin: 15px 0;
@@ -380,7 +406,10 @@
                                 <div id="video-player-1"></div>
                             </div>
                             <div class="competitor-info">
-                                <h3 id="song-title-1">Song 1</h3>
+                                <div class="competitor-info-header">
+                                    <h3 id="song-title-1">Song 1</h3>
+                                    <span id="modal-vote-check-1" class="modal-vote-check unvoted">—</span>
+                                </div>
                                 <p id="song-artist-1">Artist</p>
                             </div>
                             <div class="competitor-vote">
@@ -418,7 +447,10 @@
                                 <div id="video-player-2"></div>
                             </div>
                             <div class="competitor-info">
-                                <h3 id="song-title-2">Song 2</h3>
+                                <div class="competitor-info-header">
+                                    <h3 id="song-title-2">Song 2</h3>
+                                    <span id="modal-vote-check-2" class="modal-vote-check unvoted">—</span>
+                                </div>
                                 <p id="song-artist-2">Artist</p>
                             </div>
                             <div class="competitor-vote">
@@ -451,6 +483,10 @@
                         </div>
                     </div>
 
+                    <div style="text-align: center; margin: 10px 0;">
+                        <button id="abstain-btn" class="btn-secondary" style="opacity: 0.7;">Abstain from picking</button>
+                    </div>
+
                     <div class="users-picks" id="users-picks">
                         <!-- User picks will be shown here -->
                     </div>
@@ -475,6 +511,7 @@
                 this.videoSyncEnabled = true;
                 this.currentMatch = null;
                 this.myPick = null;
+                this.winnerPlayer = null;
                 this.svg = null;
                 this.roundDivs = [];
                 this.shouldAutoOpenFirstMatch = false;
@@ -533,6 +570,10 @@
 
                 document.getElementById('pick-btn-2').addEventListener('click', () => {
                     this.pickWinner(2);
+                });
+
+                document.getElementById('abstain-btn').addEventListener('click', () => {
+                    this.abstainPick();
                 });
 
                 // Vote button handlers
@@ -598,7 +639,7 @@
                         // Update button to show success
                         voteButton.textContent = 'Vote Submitted!';
                         setTimeout(() => {
-                            voteButton.textContent = 'Submit Vote';
+                            voteButton.textContent = 'Update Vote';
                             voteButton.disabled = false;
                         }, 2000);
 
@@ -622,6 +663,10 @@
                         );
                         // Add new vote
                         this.existingVotes[song.song_id].push(voteData);
+
+                        // Update vote check indicators on bracket and modal
+                        this.updateVoteCheck(song.song_id);
+                        this.setModalVoteCheck(songNumber, true);
                     } else {
                         const errorText = await response.text();
                         alert(`Failed to submit vote: ${errorText}`);
@@ -646,22 +691,50 @@
                 const currentUserId = this.getCurrentUserId();
 
                 // Populate rating for song 1
+                let hasVote1 = false;
                 if (match.song1 && match.song1.song_id && this.existingVotes[match.song1.song_id]) {
                     const votes = this.existingVotes[match.song1.song_id];
                     const userVote = votes.find(vote => vote.user_id === currentUserId);
                     if (userVote) {
                         document.getElementById('rating-1').value = userVote.rating;
+                        hasVote1 = true;
                     }
                 }
+                document.getElementById('vote-btn-1').textContent = hasVote1 ? 'Update Vote' : 'Submit Vote';
+                this.setModalVoteCheck(1, hasVote1);
 
                 // Populate rating for song 2
+                let hasVote2 = false;
                 if (match.song2 && match.song2.song_id && this.existingVotes[match.song2.song_id]) {
                     const votes = this.existingVotes[match.song2.song_id];
                     const userVote = votes.find(vote => vote.user_id === currentUserId);
                     if (userVote) {
                         document.getElementById('rating-2').value = userVote.rating;
+                        hasVote2 = true;
                     }
                 }
+                document.getElementById('vote-btn-2').textContent = hasVote2 ? 'Update Vote' : 'Submit Vote';
+                this.setModalVoteCheck(2, hasVote2);
+            }
+
+            setModalVoteCheck(songNumber, hasVoted) {
+                const el = document.getElementById(`modal-vote-check-${songNumber}`);
+                if (!el) return;
+                if (hasVoted) {
+                    el.textContent = '✓';
+                    el.classList.remove('unvoted');
+                } else {
+                    el.textContent = '—';
+                    el.classList.add('unvoted');
+                }
+            }
+
+            updateVoteCheck(songId) {
+                const checks = document.querySelectorAll(`.vote-check[data-song-id="${songId}"]`);
+                checks.forEach(check => {
+                    check.textContent = '✓';
+                    check.classList.remove('unvoted');
+                });
             }
 
             handleMessage(message) {
@@ -741,6 +814,7 @@
 
                 // Update currently open match if it exists
                 if (this.currentMatch && this.currentMatch.match_id) {
+                    const previousStatus = this.currentMatch.status;
                     // Find updated match data in new tree state
                     for (const round of this.treeState.rounds) {
                         for (const match of round.matches) {
@@ -752,6 +826,24 @@
                                 // Update existing votes if modal is open
                                 this.populateExistingVotes(match);
                                 break;
+                            }
+                        }
+                    }
+
+                    // Match just completed (via server) — show results to all clients
+                    if (previousStatus !== 'completed' && this.currentMatch.status === 'completed' && this.currentMatch.winner) {
+                        const isFinal = this.isFinalMatch();
+                        if (isFinal) {
+                            this.showTournamentWinner(this.currentMatch);
+                        } else {
+                            // Find next match and navigate after announcement
+                            const nextMatch = this.findNextMatch();
+                            if (nextMatch) {
+                                this.showWinnerAnnouncement(this.currentMatch, () => {
+                                    this.openMatch(nextMatch);
+                                });
+                            } else {
+                                this.showWinnerAnnouncement(this.currentMatch, null, true);
                             }
                         }
                     }
@@ -1193,6 +1285,21 @@
                     }
 
                     songDiv.appendChild(infoDiv);
+
+                    // Vote status indicator
+                    const checkSpan = document.createElement('span');
+                    checkSpan.className = 'vote-check';
+                    checkSpan.dataset.songId = song.song_id;
+                    const currentUserId = this.getCurrentUserId();
+                    const votes = this.existingVotes[song.song_id] || [];
+                    const hasVoted = votes.some(v => v.user_id === currentUserId);
+                    if (hasVoted) {
+                        checkSpan.textContent = '✓';
+                    } else {
+                        checkSpan.textContent = '—';
+                        checkSpan.classList.add('unvoted');
+                    }
+                    songDiv.appendChild(checkSpan);
                 } else {
                     const placeholder = document.createElement('div');
                     placeholder.className = 'match-song-info';
@@ -1273,8 +1380,27 @@
                 // Show modal
                 document.getElementById('match-modal').classList.add('active');
 
-                // Update pick status
+                // Restore pick state from existing user_picks
+                if (match.user_picks) {
+                    const currentUserId = this.getCurrentUserId();
+                    const existingPick = match.user_picks.find(p => p.user_id === currentUserId);
+                    if (existingPick) {
+                        if (existingPick.picked_song_id) {
+                            this.myPick = existingPick.picked_song_id;
+                            if (match.song1 && match.song1.song_id === existingPick.picked_song_id) {
+                                document.getElementById('competitor-1').classList.add('picked');
+                            } else if (match.song2 && match.song2.song_id === existingPick.picked_song_id) {
+                                document.getElementById('competitor-2').classList.add('picked');
+                            }
+                        } else {
+                            this.myPick = 'abstain';
+                        }
+                    }
+                }
+
+                // Update pick status and buttons
                 this.updatePickStatus(match);
+                this.updatePickButtons();
             }
 
             initMatchVideos(match) {
@@ -1369,6 +1495,13 @@
                 if (!this.currentMatch) return;
 
                 const songId = songNumber === 1 ? this.currentMatch.song1.song_id : this.currentMatch.song2.song_id;
+
+                // If clicking the same song again, remove the pick
+                if (this.myPick === songId) {
+                    this.removePick();
+                    return;
+                }
+
                 this.myPick = songId;
 
                 // Highlight picked competitor
@@ -1396,6 +1529,9 @@
                 // Update the pick status display immediately
                 this.updatePickStatus(this.currentMatch);
 
+                // Update button text
+                this.updatePickButtons();
+
                 // Send pick to server
                 this.sendMessage('pick_winner', {
                     match_id: this.currentMatch.match_id,
@@ -1403,10 +1539,96 @@
                 });
             }
 
+            updatePickButtons() {
+                const btn1 = document.getElementById('pick-btn-1');
+                const btn2 = document.getElementById('pick-btn-2');
+                if (!this.currentMatch) return;
+
+                const song1Id = this.currentMatch.song1 ? this.currentMatch.song1.song_id : null;
+                const song2Id = this.currentMatch.song2 ? this.currentMatch.song2.song_id : null;
+
+                btn1.textContent = (this.myPick && this.myPick === song1Id) ? 'Remove Pick' : 'Pick This Song';
+                btn2.textContent = (this.myPick && this.myPick === song2Id) ? 'Remove Pick' : 'Pick This Song';
+            }
+
+            removePick() {
+                if (!this.currentMatch) return;
+
+                this.myPick = null;
+
+                // Remove highlight from both competitors
+                document.getElementById('competitor-1').classList.remove('picked');
+                document.getElementById('competitor-2').classList.remove('picked');
+
+                // Remove pick from local state
+                const currentUserId = this.getCurrentUserId();
+                if (this.currentMatch.user_picks) {
+                    this.currentMatch.user_picks = this.currentMatch.user_picks.filter(p => p.user_id !== currentUserId);
+                }
+
+                this.updatePickStatus(this.currentMatch);
+                this.updatePickButtons();
+
+                // Send removal to server
+                this.sendMessage('remove_pick', {
+                    match_id: this.currentMatch.match_id
+                });
+            }
+
+            abstainPick() {
+                if (!this.currentMatch) return;
+
+                this.myPick = 'abstain';
+
+                // Remove highlight from both competitors
+                document.getElementById('competitor-1').classList.remove('picked');
+                document.getElementById('competitor-2').classList.remove('picked');
+
+                // Optimistically update UI
+                const currentUserId = this.getCurrentUserId();
+                const currentUsername = '{{.username}}';
+
+                if (!this.currentMatch.user_picks) {
+                    this.currentMatch.user_picks = [];
+                }
+                this.currentMatch.user_picks = this.currentMatch.user_picks.filter(p => p.user_id !== currentUserId);
+
+                this.currentMatch.user_picks.push({
+                    user_id: currentUserId,
+                    username: currentUsername,
+                    picked_song_id: null,
+                    picked_at: new Date().toISOString()
+                });
+
+                this.updatePickStatus(this.currentMatch);
+                this.updatePickButtons();
+
+                // Send abstain to server (song_id 0 = abstain)
+                this.sendMessage('pick_winner', {
+                    match_id: this.currentMatch.match_id,
+                    song_id: 0
+                });
+            }
+
             goToNextMatch() {
                 if (!this.currentMatch || !this.treeState) return;
 
-                // Check if all users have picked
+                // If match is already completed, just navigate locally
+                if (this.currentMatch.status === 'completed') {
+                    if (this.isFinalMatch()) {
+                        this.showTournamentWinner(this.currentMatch);
+                    } else {
+                        const nextMatch = this.findNextMatch();
+                        if (nextMatch) {
+                            this.showWinnerAnnouncement(this.currentMatch, () => {
+                                this.openMatch(nextMatch);
+                            });
+                        }
+                    }
+                    return;
+                }
+
+                // Check if all users have picked or abstained
                 const picksCount = this.currentMatch.user_picks ? this.currentMatch.user_picks.length : 0;
                 const allPicked = picksCount >= this.currentUsers.length;
 
@@ -1420,18 +1642,11 @@
                     // If warning is already visible, user confirmed - proceed
                 }
 
-                // Check if this is the final match (last round, no next match available)
-                const isFinalMatch = this.isFinalMatch();
-
-                if (isFinalMatch) {
-                    // For the final match, just show the winner announcement and keep it displayed
-                    if (this.currentMatch.status === 'completed' && this.currentMatch.winner) {
-                        this.showWinnerAnnouncement(this.currentMatch, null, true); // permanent = true
-                    }
-                } else {
-                    // Broadcast navigation immediately to all clients
-                    this.proceedToNextMatch(true); // true = send message to all clients
-                }
+                // Send complete_match to server — the broadcast will trigger
+                // winner announcement and navigation for all clients
+                this.sendMessage('complete_match', {
+                    match_id: this.currentMatch.match_id
+                });
             }
 
             isFinalMatch() {
@@ -1460,6 +1675,118 @@
                 const hasNextRound = currentRoundIndex + 1 < this.treeState.rounds.length;
 
                 return !hasNextInRound && !hasNextRound;
+            }
+
+            findNextMatch() {
+                if (!this.currentMatch || !this.treeState) return null;
+
+                let currentRoundIndex = -1;
+                let currentMatchIndex = -1;
+
+                for (let rIdx = 0; rIdx < this.treeState.rounds.length; rIdx++) {
+                    const round = this.treeState.rounds[rIdx];
+                    for (let mIdx = 0; mIdx < round.matches.length; mIdx++) {
+                        if (round.matches[mIdx].match_id === this.currentMatch.match_id) {
+                            currentRoundIndex = rIdx;
+                            currentMatchIndex = mIdx;
+                            break;
+                        }
+                    }
+                    if (currentRoundIndex !== -1) break;
+                }
+
+                if (currentRoundIndex === -1) return null;
+
+                // Check next match in same round
+                if (currentMatchIndex + 1 < this.treeState.rounds[currentRoundIndex].matches.length) {
+                    const next = this.treeState.rounds[currentRoundIndex].matches[currentMatchIndex + 1];
+                    if (next.song1 && next.song1.song_id && next.song2 && next.song2.song_id) {
+                        return next;
+                    }
+                }
+
+                // Check first match of next round
+                if (currentRoundIndex + 1 < this.treeState.rounds.length) {
+                    const next = this.treeState.rounds[currentRoundIndex + 1].matches[0];
+                    if (next && next.song1 && next.song1.song_id && next.song2 && next.song2.song_id) {
+                        return next;
+                    }
+                }
+
+                return null;
+            }
+
+            showTournamentWinner(match) {
+                if (!match.winner) return;
+
+                const winner = match.winner;
+                let title = winner.song_title;
+                if (winner.song_title_english && winner.song_title_english !== winner.song_title) {
+                    title = `${winner.song_title} (${winner.song_title_english})`;
+                }
+
+                // Close the match modal
+                document.getElementById('match-modal').classList.remove('active');
+
+                // Clean up winner player if it exists
+                if (this.winnerPlayer) {
+                    this.winnerPlayer.destroy();
+                    this.winnerPlayer = null;
+                }
+
+                // Show a tournament winner overlay
+                let overlay = document.getElementById('tournament-winner-overlay');
+                if (!overlay) {
+                    overlay = document.createElement('div');
+                    overlay.id = 'tournament-winner-overlay';
+                    overlay.className = 'match-modal';
+                    overlay.innerHTML = `
+                        <div class="match-modal-content" style="text-align: center; max-width: 600px;">
+                            <h2 style="margin-bottom: 20px;">Tournament Complete!</h2>
+                            <div class="winner-announcement" style="display: block; margin-bottom: 20px;">
+                                <div class="winner-content">
+                                    <h3>🏆 Champion 🏆</h3>
+                                    <div id="tournament-winner-title" class="winner-song-title"></div>
+                                    <div id="tournament-winner-reason" class="winner-reason"></div>
+                                </div>
+                            </div>
+                            <div id="winner-video-container" style="width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 4px;">
+                                <div id="winner-video-player"></div>
+                            </div>
+                            <button id="close-winner-overlay" class="btn-secondary" style="margin-top: 20px;">Close</button>
+                        </div>
+                    `;
+                    document.body.appendChild(overlay);
+                    document.getElementById('close-winner-overlay').addEventListener('click', () => {
+                        overlay.classList.remove('active');
+                        if (this.winnerPlayer) {
+                            this.winnerPlayer.destroy();
+                            this.winnerPlayer = null;
+                        }
+                    });
+                } else {
+                    // Reset video container for re-use
+                    document.getElementById('winner-video-container').innerHTML = '<div id="winner-video-player"></div>';
+                }
+
+                document.getElementById('tournament-winner-title').textContent = title;
+                document.getElementById('tournament-winner-reason').textContent = this.determineWinReason(match);
+                overlay.classList.add('active');
+
+                // Initialize winner video
+                const videoId = this.extractYouTubeId(winner.embed_url);
+                if (videoId && typeof YT !== 'undefined' && YT.Player) {
+                    this.winnerPlayer = new YT.Player('winner-video-player', {
+                        videoId: videoId,
+                        width: '100%',
+                        height: '100%',
+                        playerVars: {
+                            autoplay: 0,
+                            rel: 0,
+                            modestbranding: 1
+                        }
+                    });
+                }
             }
 
             showWinnerAnnouncement(match, callback, permanent = false) {
@@ -1574,14 +1901,10 @@
                         });
                     }
 
-                    // Show winner announcement if applicable, then open next match
-                    if (this.currentMatch.status === 'completed' && this.currentMatch.winner) {
-                        this.showWinnerAnnouncement(this.currentMatch, () => {
-                            this.openMatch(nextMatch);
-                        });
-                    } else {
+                    // Determine winner locally for announcement, then open next match
+                    this.showWinnerAnnouncement(this.currentMatch, () => {
                         this.openMatch(nextMatch);
-                    }
+                    });
                 } else {
                     alert('No more matches available. Tournament may be complete or waiting for previous matches to finish.');
                 }
@@ -1597,9 +1920,10 @@
                         badge.className = 'user-pick-badge';
 
                         // Determine which song was picked
-                        let songName = 'unknown';
-                        let songEnglishName = null;
+                        let displayName = 'Abstained';
                         if (pick.picked_song_id) {
+                            let songName = 'unknown';
+                            let songEnglishName = null;
                             if (match.song1 && match.song1.song_id === pick.picked_song_id) {
                                 songName = match.song1.song_title;
                                 songEnglishName = match.song1.song_title_english;
@@ -1607,12 +1931,9 @@
                                 songName = match.song2.song_title;
                                 songEnglishName = match.song2.song_title_english;
                             }
-                        }
-
-                        // Add English title in parentheses if available and different
-                        let displayName = songName;
-                        if (songEnglishName && songEnglishName !== songName) {
-                            displayName = `${songName} (${songEnglishName})`;
+                            displayName = songEnglishName && songEnglishName !== songName
+                                ? `${songName} (${songEnglishName})`
+                                : songName;
                         }
 
                         badge.textContent = `${pick.username} → ${displayName}`;
