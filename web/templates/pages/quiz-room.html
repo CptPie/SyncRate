@@ -516,21 +516,21 @@
                     <div class="stage-info" id="stage-info"></div>
                 </div>
 
-                <!-- Advance stage confirm modal -->
+                <!-- Ready-check confirm modal (used by advance stage and show results) -->
                 <div class="modal" id="advance-confirm-modal">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h3>Advance Stage?</h3>
+                            <h3 id="advance-confirm-title">Continue?</h3>
                             <button type="button" class="modal-close" id="advance-confirm-close">&times;</button>
                         </div>
                         <div class="modal-body">
                             <p>The following players are not yet ready:</p>
                             <p id="advance-confirm-names" style="font-weight: 600;"></p>
-                            <p>Advance to the next stage anyway?</p>
+                            <p id="advance-confirm-question">Continue anyway?</p>
                         </div>
                         <div class="modal-actions">
                             <button type="button" class="btn-secondary" id="advance-confirm-cancel">Cancel</button>
-                            <button type="button" class="btn-primary" id="advance-confirm-ok">Advance</button>
+                            <button type="button" class="btn-primary" id="advance-confirm-ok">Continue</button>
                         </div>
                     </div>
                 </div>
@@ -696,24 +696,36 @@
                 });
 
                 document.getElementById('advance-stage-btn').addEventListener('click', () => {
-                    this.requestAdvanceStage();
+                    this.confirmIfNotReady({
+                        title: 'Advance Stage?',
+                        question: 'Advance to the next stage anyway?',
+                        okLabel: 'Advance',
+                        onConfirm: () => this.sendMessage('advance_stage', {}),
+                    });
+                });
+
+                document.getElementById('complete-round-btn').addEventListener('click', () => {
+                    this.confirmIfNotReady({
+                        title: 'Show Results?',
+                        question: 'Show the round results anyway?',
+                        okLabel: 'Show Results',
+                        onConfirm: () => this.sendMessage('complete_round', {}),
+                    });
                 });
 
                 const closeAdvanceModal = () => {
                     document.getElementById('advance-confirm-modal').style.display = 'none';
+                    this._pendingConfirm = null;
                 };
                 document.getElementById('advance-confirm-close').addEventListener('click', closeAdvanceModal);
                 document.getElementById('advance-confirm-cancel').addEventListener('click', closeAdvanceModal);
                 document.getElementById('advance-confirm-ok').addEventListener('click', () => {
+                    const fn = this._pendingConfirm;
                     closeAdvanceModal();
-                    this.sendMessage('advance_stage', {});
+                    if (fn) fn();
                 });
                 document.getElementById('advance-confirm-modal').addEventListener('click', (e) => {
                     if (e.target.id === 'advance-confirm-modal') closeAdvanceModal();
-                });
-
-                document.getElementById('complete-round-btn').addEventListener('click', () => {
-                    this.sendMessage('complete_round', {});
                 });
 
                 document.getElementById('play-pause-btn').addEventListener('click', () => {
@@ -1400,7 +1412,7 @@
             }
 
             toggleReady() {
-                if (!this.quizState || this.quizState.quiz_style !== 'progressive') return;
+                if (!this.quizState) return;
                 const ready = this.quizState.stage_ready || {};
                 const nowReady = !ready[this.getCurrentUserId()];
                 this.sendMessage('set_ready', { ready: nowReady });
@@ -1416,10 +1428,8 @@
                     : null;
                 const shouldShow =
                     state &&
-                    state.quiz_style === 'progressive' &&
                     currentRound &&
-                    currentRound.status === 'playing' &&
-                    (state.current_stage || 0) < 4;
+                    currentRound.status === 'playing';
 
                 if (!shouldShow) {
                     btn.style.display = 'none';
@@ -1438,18 +1448,20 @@
                 count.textContent = `${readyCount}/${total} ready`;
             }
 
-            requestAdvanceStage() {
+            confirmIfNotReady({ title, question, okLabel, onConfirm }) {
                 const state = this.quizState;
                 const ready = (state && state.stage_ready) || {};
-                const notReady = state && state.quiz_style === 'progressive'
-                    ? this.onlineUsers.filter(u => !ready[u.id])
-                    : [];
+                const notReady = this.onlineUsers.filter(u => !ready[u.id]);
                 if (notReady.length === 0) {
-                    this.sendMessage('advance_stage', {});
+                    onConfirm();
                     return;
                 }
+                document.getElementById('advance-confirm-title').textContent = title;
+                document.getElementById('advance-confirm-question').textContent = question;
+                document.getElementById('advance-confirm-ok').textContent = okLabel;
                 document.getElementById('advance-confirm-names').textContent =
                     notReady.map(u => u.username).join(', ');
+                this._pendingConfirm = onConfirm;
                 document.getElementById('advance-confirm-modal').style.display = 'flex';
             }
 

@@ -623,10 +623,6 @@ func handleSetReady(db *gorm.DB, roomID, userID string, data json.RawMessage) {
 		return
 	}
 
-	if room.QuizStyle != "progressive" {
-		return
-	}
-
 	if room.QuizState.StageReady == nil {
 		room.QuizState.StageReady = map[string]bool{}
 	}
