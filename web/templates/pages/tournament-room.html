@@ -249,6 +249,22 @@
             color: var(--text-secondary);
             opacity: 0.4;
         }
+        .cover-badge {
+            display: none;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: var(--accent-primary);
+            color: var(--text-inverse);
+            margin-left: 10px;
+            flex-shrink: 0;
+        }
+        .cover-badge.visible {
+            display: inline-block;
+        }
         .competitor-vote {
             margin: 15px 0;
             padding: 15px;
@@ -408,6 +424,7 @@
                             <div class="competitor-info">
                                 <div class="competitor-info-header">
                                     <h3 id="song-title-1">Song 1</h3>
+                                    <span id="cover-badge-1" class="cover-badge">Cover</span>
                                     <span id="modal-vote-check-1" class="modal-vote-check unvoted">—</span>
                                 </div>
                                 <p id="song-artist-1">Artist</p>
@@ -449,6 +466,7 @@
                             <div class="competitor-info">
                                 <div class="competitor-info-header">
                                     <h3 id="song-title-2">Song 2</h3>
+                                    <span id="cover-badge-2" class="cover-badge">Cover</span>
                                     <span id="modal-vote-check-2" class="modal-vote-check unvoted">—</span>
                                 </div>
                                 <p id="song-artist-2">Artist</p>
@@ -1370,6 +1388,9 @@
                 document.getElementById('song-artist-1').textContent = match.song1.artists;
                 document.getElementById('song-title-2').textContent = song2Title;
                 document.getElementById('song-artist-2').textContent = match.song2.artists;
+
+                document.getElementById('cover-badge-1').classList.toggle('visible', !!match.song1.is_cover);
+                document.getElementById('cover-badge-2').classList.toggle('visible', !!match.song2.is_cover);
 
                 // Initialize video players
                 this.initMatchVideos(match);
