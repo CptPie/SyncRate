@@ -584,6 +584,20 @@
             type: 'song'
         }));
 
+        // Lookup maps used by the "filter titles by guessed artist" feature.
+        // songsById: song_id -> { artistIds:Set, unitIds:Set }
+        // artistUnits: artist_id -> Set<unit_id>
+        const songsById = new Map();
+        songsData.forEach(s => {
+            const artistIds = new Set((s.Artists || []).map(a => a.ArtistID));
+            const unitIds = new Set((s.Units || []).map(u => u.UnitID));
+            songsById.set(s.SongID, { artistIds, unitIds });
+        });
+        const artistUnits = new Map();
+        artistsData.forEach(a => {
+            artistUnits.set(a.ArtistID, new Set((a.Units || []).map(u => u.UnitID)));
+        });
+
         // Note: JSON field names match Go struct field names (PascalCase)
         // Song: SongID, NameOriginal, NameEnglish
         // Artist: ArtistID, NameOriginal, NameEnglish
@@ -608,6 +622,7 @@
                 this.artistGuesses = [];
                 this.existingVotes = {};
                 this.onlineUsers = [];
+                this.filterArtistEntity = null;
 
                 this.initWebSocket();
                 this.initYouTubePlayer();
@@ -752,14 +767,16 @@
             setupGuessInputs() {
                 // Set up fuzzy search dropdowns for guess inputs
                 // Pass a getter for the guesses array so the dropdown filters dynamically
-                this.setupFuzzyDropdown('title-guess-input', 'title-guess-dropdown', songGuessData, () => this.titleGuesses);
+                this.setupFuzzyDropdown('title-guess-input', 'title-guess-dropdown', () => this.getFilteredTitleData(), () => this.titleGuesses);
                 this.setupFuzzyDropdown('artist-guess-input', 'artist-guess-dropdown', artistGuessData, () => this.artistGuesses);
             }
 
-            setupFuzzyDropdown(inputId, dropdownId, data, getGuesses) {
+            setupFuzzyDropdown(inputId, dropdownId, dataOrGetter, getGuesses) {
                 const input = document.getElementById(inputId);
                 const dropdown = document.getElementById(dropdownId);
                 let highlightedIndex = -1;
+                const resolveData = () =>
+                    typeof dataOrGetter === 'function' ? dataOrGetter() : dataOrGetter;
 
                 input.addEventListener('input', () => {
                     const query = input.value.trim().toLowerCase();
@@ -772,7 +789,7 @@
                     const guessed = (getGuesses() || []).map(g => g.toLowerCase());
 
                     // Score and filter
-                    const scored = data.filter(item => {
+                    const scored = resolveData().filter(item => {
                         // Exclude already-guessed items
                         const nameLower = item.name.toLowerCase();
                         const origLower = (item.original || '').toLowerCase();
@@ -1118,6 +1135,7 @@
                     artistStatus.textContent = 'Correct!';
                     artistStatus.className = 'guess-status correct';
                     artistInput.disabled = true;
+                    this.resolveFilterArtistEntity(userGuess && userGuess.artist_guess);
                 } else if (artistGuessedThisStage) {
                     artistStatus.textContent = 'Incorrect';
                     artistStatus.className = 'guess-status incorrect';
@@ -1161,6 +1179,7 @@
                 this.stopAudio();
                 this.titleCorrect = false;
                 this.artistCorrect = false;
+                this.filterArtistEntity = null;
                 this.elapsedBeforePause = 0;
                 this.playStartedAt = 0;
 
@@ -1465,6 +1484,44 @@
                 document.getElementById('advance-confirm-modal').style.display = 'flex';
             }
 
+            resolveFilterArtistEntity(guessText) {
+                if (!this.quizState || !this.quizState.filter_by_guessed_artist) return;
+                if (this.quizState.question_type !== 'both') return;
+                if (!guessText) return;
+                const norm = guessText.trim().toLowerCase();
+                const match = artistGuessData.find(e =>
+                    e.name.toLowerCase() === norm ||
+                    (e.original || '').toLowerCase() === norm);
+                if (match) {
+                    this.filterArtistEntity = { id: match.id, type: match.type };
+                }
+            }
+
+            getFilteredTitleData() {
+                if (!this.filterArtistEntity) return songGuessData;
+                const { id, type } = this.filterArtistEntity;
+                const allowedArtistIds = new Set();
+                const allowedUnitIds = new Set();
+                if (type === 'unit') {
+                    allowedUnitIds.add(id);
+                } else {
+                    allowedArtistIds.add(id);
+                    const units = artistUnits.get(id);
+                    if (units) units.forEach(u => allowedUnitIds.add(u));
+                }
+                return songGuessData.filter(s => {
+                    const rec = songsById.get(s.id);
+                    if (!rec) return false;
+                    for (const aid of rec.artistIds) {
+                        if (allowedArtistIds.has(aid)) return true;
+                    }
+                    for (const uid of rec.unitIds) {
+                        if (allowedUnitIds.has(uid)) return true;
+                    }
+                    return false;
+                });
+            }
+
             extractVideoId(embedUrl) {
                 const match = embedUrl.match(/\/embed\/([^?]+)/);
                 return match ? match[1] : null;
@@ -1522,6 +1579,11 @@
                         artistStatus.textContent = 'Correct!';
                         artistStatus.className = 'guess-status correct';
                         document.getElementById('artist-guess-input').disabled = true;
+                        // The guess that just matched is the most recent entry in
+                        // artistGuesses. Resolve it to an artist/unit entry so the
+                        // title dropdown can be narrowed.
+                        const last = this.artistGuesses[this.artistGuesses.length - 1];
+                        this.resolveFilterArtistEntity(last);
                     }
                     if (this.checkAllCorrect()) {
                         document.getElementById('submit-guess-btn').disabled = true;

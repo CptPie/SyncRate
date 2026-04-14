@@ -20,6 +20,7 @@ type QuizRoom struct {
 	CoversOnly       bool      `gorm:"default:false"`
 	FuzzyInput       bool      `gorm:"default:true"`         // use fuzzy search dropdowns vs free text
 	OneOfArtists     bool      `gorm:"default:false"`        // correct if at least one artist matches
+	FilterByGuessedArtist bool `gorm:"default:false"`        // when question_type=both, narrow title dropdown to songs by the guessed artist
 	QuizState        QuizState `gorm:"type:jsonb"`
 	Status           string    `gorm:"default:'setup'"`      // setup, in_progress
 	CreatedAt        time.Time

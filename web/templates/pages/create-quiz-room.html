@@ -151,6 +151,18 @@
                 guessed correctly
               </p>
             </div>
+
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="filter-by-guessed-artist" />
+                <span>Filter Titles by Guessed Artist</span>
+              </label>
+              <p class="checkbox-description">
+                When guessing both title and artist, once the artist is
+                correct, restrict the title dropdown to songs by that artist
+                (and groups they belong to)
+              </p>
+            </div>
           </div>
 
           <button id="create-room-btn" class="btn-primary">Create Quiz</button>
@@ -233,6 +245,8 @@
           const fuzzyInput = document.getElementById("fuzzy-input").checked;
           const oneOfArtists =
             document.getElementById("one-of-artists").checked;
+          const filterByGuessedArtist =
+            document.getElementById("filter-by-guessed-artist").checked;
 
           const requestBody = {
             question_type: questionType,
@@ -241,6 +255,7 @@
             covers_only: coversOnly,
             fuzzy_input: fuzzyInput,
             one_of_artists: oneOfArtists,
+            filter_by_guessed_artist: filterByGuessedArtist,
           };
 
           if (quizMode !== "endless") {

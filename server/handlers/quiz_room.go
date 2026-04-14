@@ -92,6 +92,7 @@ func PostCreateQuizRoom(db *gorm.DB) gin.HandlerFunc {
 			CoversOnly     bool     `json:"covers_only"`
 			FuzzyInput     bool     `json:"fuzzy_input"`
 			OneOfArtists   bool     `json:"one_of_artists"`
+			FilterByGuessedArtist bool `json:"filter_by_guessed_artist"`
 		}
 
 		if err := c.ShouldBindJSON(&requestBody); err != nil {
@@ -138,6 +139,7 @@ func PostCreateQuizRoom(db *gorm.DB) gin.HandlerFunc {
 			CoversOnly:     requestBody.CoversOnly,
 			FuzzyInput:     requestBody.FuzzyInput,
 			OneOfArtists:   requestBody.OneOfArtists,
+			FilterByGuessedArtist: requestBody.FilterByGuessedArtist,
 			QuizState: models.QuizState{
 				Rounds:       []models.QuizRound{},
 				Scores:       []models.PlayerScore{},
@@ -214,10 +216,17 @@ func GetQuizRoom(db *gorm.DB) gin.HandlerFunc {
 			if room.CoversOnly {
 				query = query.Where("is_cover = ?", true)
 			}
+			if room.FilterByGuessedArtist {
+				query = query.Preload("Artists").Preload("Units")
+			}
 			query.Find(&songs)
 
 			var artists []models.Artist
-			db.Find(&artists)
+			if room.FilterByGuessedArtist {
+				db.Preload("Units").Find(&artists)
+			} else {
+				db.Find(&artists)
+			}
 
 			var units []models.Unit
 			db.Find(&units)
@@ -355,6 +364,7 @@ func buildQuizStateForClient(room models.QuizRoom, userID string) map[string]int
 		"fixed_time_limit": room.FixedTimeLimit,
 		"fuzzy_input":      room.FuzzyInput,
 		"one_of_artists":   room.OneOfArtists,
+		"filter_by_guessed_artist": room.FilterByGuessedArtist,
 		"max_rounds":       room.MaxRounds,
 		"rounds":           sanitizedRounds,
 		"scores":           room.QuizState.Scores,
