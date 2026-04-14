@@ -109,6 +109,28 @@
             cursor: pointer;
             position: relative;
         }
+        #ready-btn.ready-active {
+            background: var(--accent-secondary, #4caf50);
+        }
+        #advance-confirm-modal .modal-actions .btn-primary,
+        #advance-confirm-modal .modal-actions .btn-secondary {
+            width: auto;
+            padding: 10px 20px;
+            font-size: 15px;
+        }
+        #advance-confirm-modal .modal-actions .btn-secondary {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+        #advance-confirm-modal .modal-actions .btn-secondary:hover {
+            background: var(--bg-tertiary, var(--bg-secondary));
+        }
+        .ready-count {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-left: 8px;
+        }
         .audio-progress-bar {
             height: 100%;
             background: var(--accent-primary);
@@ -487,9 +509,30 @@
                     <div class="audio-controls">
                         <button id="play-pause-btn" disabled>Play</button>
                         <button id="replay-btn" disabled>Replay</button>
+                        <button id="ready-btn" style="display: none;">Ready</button>
+                        <span class="ready-count" id="ready-count"></span>
                         <div class="audio-time-display" id="audio-time">0:00 / 0:00</div>
                     </div>
                     <div class="stage-info" id="stage-info"></div>
+                </div>
+
+                <!-- Advance stage confirm modal -->
+                <div class="modal" id="advance-confirm-modal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>Advance Stage?</h3>
+                            <button type="button" class="modal-close" id="advance-confirm-close">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <p>The following players are not yet ready:</p>
+                            <p id="advance-confirm-names" style="font-weight: 600;"></p>
+                            <p>Advance to the next stage anyway?</p>
+                        </div>
+                        <div class="modal-actions">
+                            <button type="button" class="btn-secondary" id="advance-confirm-cancel">Cancel</button>
+                            <button type="button" class="btn-primary" id="advance-confirm-ok">Advance</button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Guess area -->
@@ -564,6 +607,7 @@
                 this.titleGuesses = [];
                 this.artistGuesses = [];
                 this.existingVotes = {};
+                this.onlineUsers = [];
 
                 this.initWebSocket();
                 this.initYouTubePlayer();
@@ -652,7 +696,20 @@
                 });
 
                 document.getElementById('advance-stage-btn').addEventListener('click', () => {
+                    this.requestAdvanceStage();
+                });
+
+                const closeAdvanceModal = () => {
+                    document.getElementById('advance-confirm-modal').style.display = 'none';
+                };
+                document.getElementById('advance-confirm-close').addEventListener('click', closeAdvanceModal);
+                document.getElementById('advance-confirm-cancel').addEventListener('click', closeAdvanceModal);
+                document.getElementById('advance-confirm-ok').addEventListener('click', () => {
+                    closeAdvanceModal();
                     this.sendMessage('advance_stage', {});
+                });
+                document.getElementById('advance-confirm-modal').addEventListener('click', (e) => {
+                    if (e.target.id === 'advance-confirm-modal') closeAdvanceModal();
                 });
 
                 document.getElementById('complete-round-btn').addEventListener('click', () => {
@@ -665,6 +722,10 @@
 
                 document.getElementById('replay-btn').addEventListener('click', () => {
                     this.replayAudio();
+                });
+
+                document.getElementById('ready-btn').addEventListener('click', () => {
+                    this.toggleReady();
                 });
 
                 document.getElementById('audio-progress').parentElement.addEventListener('click', (e) => {
@@ -856,16 +917,16 @@
             }
 
             handleUserUpdate(data) {
+                this.onlineUsers = data.users || [];
                 const usersList = document.getElementById('users-list');
                 usersList.innerHTML = '';
-                if (data.users) {
-                    data.users.forEach(user => {
-                        const badge = document.createElement('span');
-                        badge.className = 'user-badge';
-                        badge.textContent = user.username;
-                        usersList.appendChild(badge);
-                    });
-                }
+                this.onlineUsers.forEach(user => {
+                    const badge = document.createElement('span');
+                    badge.className = 'user-badge';
+                    badge.textContent = user.username;
+                    usersList.appendChild(badge);
+                });
+                this.updateReadyUI();
             }
 
             handleVoteUpdate(data) {
@@ -966,12 +1027,16 @@
 
                     // Update player guess badges
                     this.updateAllPlayersGuessStatus(currentRound);
+
+                    // Update ready button state
+                    this.updateReadyUI();
                 } else if (currentRound.status === 'completed') {
                     audioArea.style.display = 'none';
                     guessArea.style.display = 'none';
                     resultsArea.style.display = 'block';
                     advanceBtn.style.display = 'none';
                     completeBtn.style.display = 'none';
+                    this.updateReadyUI();
 
                     // Show next round button (unless max rounds reached)
                     const maxReached = state.max_rounds && state.current_round >= state.max_rounds;
@@ -1332,6 +1397,60 @@
                 }
                 this.updateProgressBar();
                 this.updateTimeDisplay(clampedTarget);
+            }
+
+            toggleReady() {
+                if (!this.quizState || this.quizState.quiz_style !== 'progressive') return;
+                const ready = this.quizState.stage_ready || {};
+                const nowReady = !ready[this.getCurrentUserId()];
+                this.sendMessage('set_ready', { ready: nowReady });
+            }
+
+            updateReadyUI() {
+                const btn = document.getElementById('ready-btn');
+                const count = document.getElementById('ready-count');
+                if (!btn || !count) return;
+                const state = this.quizState;
+                const currentRound = state && state.current_round > 0 && state.rounds
+                    ? state.rounds[state.current_round - 1]
+                    : null;
+                const shouldShow =
+                    state &&
+                    state.quiz_style === 'progressive' &&
+                    currentRound &&
+                    currentRound.status === 'playing' &&
+                    (state.current_stage || 0) < 4;
+
+                if (!shouldShow) {
+                    btn.style.display = 'none';
+                    count.textContent = '';
+                    return;
+                }
+
+                const ready = (state.stage_ready || {});
+                const iAmReady = !!ready[this.getCurrentUserId()];
+                btn.style.display = 'inline-block';
+                btn.textContent = iAmReady ? 'Unready' : 'Ready';
+                btn.classList.toggle('ready-active', iAmReady);
+
+                const total = this.onlineUsers.length || 1;
+                const readyCount = this.onlineUsers.filter(u => ready[u.id]).length;
+                count.textContent = `${readyCount}/${total} ready`;
+            }
+
+            requestAdvanceStage() {
+                const state = this.quizState;
+                const ready = (state && state.stage_ready) || {};
+                const notReady = state && state.quiz_style === 'progressive'
+                    ? this.onlineUsers.filter(u => !ready[u.id])
+                    : [];
+                if (notReady.length === 0) {
+                    this.sendMessage('advance_stage', {});
+                    return;
+                }
+                document.getElementById('advance-confirm-names').textContent =
+                    notReady.map(u => u.username).join(', ');
+                document.getElementById('advance-confirm-modal').style.display = 'flex';
             }
 
             extractVideoId(embedUrl) {

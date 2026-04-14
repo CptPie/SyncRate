@@ -360,6 +360,7 @@ func buildQuizStateForClient(room models.QuizRoom, userID string) map[string]int
 		"scores":           room.QuizState.Scores,
 		"current_round":    room.QuizState.CurrentRound,
 		"current_stage":    room.QuizState.CurrentStage,
+		"stage_ready":      room.QuizState.StageReady,
 	}
 }
 
@@ -377,6 +378,8 @@ func handleQuizMessage(db *gorm.DB, roomID, userID string, msg wsocket.WSMessage
 		handleSubmitGuess(db, roomID, userID, msg.Data)
 	case "advance_stage":
 		handleAdvanceStage(db, roomID)
+	case "set_ready":
+		handleSetReady(db, roomID, userID, msg.Data)
 	case "complete_round":
 		handleCompleteRound(db, roomID)
 	case wsocket.MsgVoteUpdate:
@@ -455,6 +458,7 @@ func handleNextRound(db *gorm.DB, roomID string) {
 	room.QuizState.Rounds = append(room.QuizState.Rounds, newRound)
 	room.QuizState.CurrentRound = newRound.RoundNumber
 	room.QuizState.CurrentStage = 0
+	room.QuizState.StageReady = map[string]bool{}
 
 	db.Model(&models.QuizRoom{}).
 		Where("room_id = ?", roomID).
@@ -594,6 +598,43 @@ func handleAdvanceStage(db *gorm.DB, roomID string) {
 	}
 
 	room.QuizState.CurrentStage++
+	room.QuizState.StageReady = map[string]bool{}
+
+	db.Model(&models.QuizRoom{}).
+		Where("room_id = ?", roomID).
+		Updates(map[string]interface{}{
+			"quiz_state":  room.QuizState,
+			"last_active": time.Now(),
+		})
+
+	broadcastQuizState(db, roomID)
+}
+
+func handleSetReady(db *gorm.DB, roomID, userID string, data json.RawMessage) {
+	var payload struct {
+		Ready bool `json:"ready"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return
+	}
+
+	var room models.QuizRoom
+	if err := db.Where("room_id = ?", roomID).First(&room).Error; err != nil {
+		return
+	}
+
+	if room.QuizStyle != "progressive" {
+		return
+	}
+
+	if room.QuizState.StageReady == nil {
+		room.QuizState.StageReady = map[string]bool{}
+	}
+	if payload.Ready {
+		room.QuizState.StageReady[userID] = true
+	} else {
+		delete(room.QuizState.StageReady, userID)
+	}
 
 	db.Model(&models.QuizRoom{}).
 		Where("room_id = ?", roomID).

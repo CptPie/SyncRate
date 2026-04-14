@@ -32,10 +32,11 @@ type QuizRoom struct {
 
 // QuizState holds all rounds played so far
 type QuizState struct {
-	Rounds       []QuizRound  `json:"rounds"`
+	Rounds       []QuizRound   `json:"rounds"`
 	Scores       []PlayerScore `json:"scores"`
-	CurrentRound int          `json:"current_round"` // 1-indexed, 0 = not started
-	CurrentStage int          `json:"current_stage"` // index into ProgressiveStages (0-4), only for progressive mode
+	CurrentRound int           `json:"current_round"` // 1-indexed, 0 = not started
+	CurrentStage int           `json:"current_stage"` // index into ProgressiveStages (0-4), only for progressive mode
+	StageReady   map[string]bool `json:"stage_ready"` // user_id -> ready to advance the current stage
 }
 
 // QuizRound represents a single quiz round
