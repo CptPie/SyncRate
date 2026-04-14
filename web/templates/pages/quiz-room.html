@@ -603,8 +603,16 @@
                             onReady: () => {
                                 this.playerReady = true;
                                 console.log('YouTube player ready');
+                                if (this.pendingVideoId) {
+                                    const vid = this.pendingVideoId;
+                                    this.pendingVideoId = null;
+                                    this.cueCurrentVideo(vid);
+                                }
                             },
                             onStateChange: (event) => {
+                                if (event.data === YT.PlayerState.CUED) {
+                                    this.adjustStartForDuration();
+                                }
                                 if (event.data === YT.PlayerState.ENDED) {
                                     this.onAudioEnded();
                                 }
@@ -1096,18 +1104,54 @@
 
                 // Load video without auto-playing
                 const videoId = this.extractVideoId(round.song.embed_url);
-                if (videoId && this.playerReady) {
-                    this.player.cueVideoById({
-                        videoId: videoId,
-                        startSeconds: this.audioStartTime,
-                    });
-                    this.isPlaying = false;
-                    document.getElementById('play-pause-btn').textContent = 'Play';
-                    document.getElementById('play-pause-btn').disabled = false;
-                    document.getElementById('replay-btn').disabled = false;
+                if (videoId) {
+                    if (this.playerReady) {
+                        this.cueCurrentVideo(videoId);
+                    } else {
+                        // Player not ready yet — queue and flush from onReady
+                        this.pendingVideoId = videoId;
+                        document.getElementById('play-pause-btn').textContent = 'Loading...';
+                        document.getElementById('play-pause-btn').disabled = true;
+                        document.getElementById('replay-btn').disabled = true;
+                    }
                 }
 
                 this.updateProgressBar();
+            }
+
+            cueCurrentVideo(videoId) {
+                this.player.cueVideoById({
+                    videoId: videoId,
+                    startSeconds: this.audioStartTime,
+                });
+                this.isPlaying = false;
+                document.getElementById('play-pause-btn').textContent = 'Play';
+                document.getElementById('play-pause-btn').disabled = false;
+                document.getElementById('replay-btn').disabled = false;
+            }
+
+            adjustStartForDuration() {
+                // When a freshly cued video reports its duration, make sure
+                // our chosen start leaves enough room for the longest clip (60s).
+                if (!this.player || !this.playerReady) return;
+                let duration = 0;
+                try { duration = this.player.getDuration(); } catch (e) { return; }
+                if (!duration || duration <= 0) return;
+                const neededWindow = 60;
+                const safeEnd = Math.max(0, duration - 2);
+                if (this.audioStartTime + neededWindow > safeEnd) {
+                    const newStart = Math.max(0, safeEnd - neededWindow);
+                    if (Math.abs(newStart - this.audioStartTime) > 0.5) {
+                        this.audioStartTime = newStart;
+                        try {
+                            this.player.seekTo(newStart, true);
+                            this.player.pauseVideo();
+                        } catch (e) {}
+                        this.elapsedBeforePause = 0;
+                        this.updateProgressBar();
+                        this.updateTimeDisplay(0);
+                    }
+                }
             }
 
             updateAudioForStage(newStage) {
@@ -1137,19 +1181,20 @@
                 if (!this.player || !this.playerReady) return;
 
                 if (this.isPlaying) {
+                    const elapsedNow = this.getElapsedTime();
                     this.player.pauseVideo();
-                    this.elapsedBeforePause += (Date.now() - this.playStartedAt) / 1000;
+                    this.elapsedBeforePause = elapsedNow;
                     this.isPlaying = false;
                     document.getElementById('play-pause-btn').textContent = 'Play';
                     this.stopProgressTracking();
                 } else {
                     // Check if we've exceeded allowed time
-                    if (this.getElapsedTime() >= this.currentMaxDuration) {
+                    if (this.elapsedBeforePause >= this.currentMaxDuration) {
                         return; // Can't play more
                     }
 
                     // Seek to correct position
-                    const seekTo = this.audioStartTime + this.getElapsedTime();
+                    const seekTo = this.audioStartTime + this.elapsedBeforePause;
                     this.player.seekTo(seekTo, true);
                     this.player.playVideo();
                     this.playStartedAt = Date.now();
@@ -1160,11 +1205,18 @@
             }
 
             getElapsedTime() {
-                let elapsed = this.elapsedBeforePause;
-                if (this.isPlaying) {
-                    elapsed += (Date.now() - this.playStartedAt) / 1000;
+                // Prefer the player's actual playback position so the
+                // max-duration pause fires at the real audio boundary
+                // (wall-clock drifts when the player buffers).
+                if (this.isPlaying && this.player && this.playerReady) {
+                    try {
+                        const ct = this.player.getCurrentTime();
+                        const e = ct - this.audioStartTime;
+                        if (isFinite(e) && e >= 0 && e < 3600) return e;
+                    } catch (err) {}
+                    return this.elapsedBeforePause + (Date.now() - this.playStartedAt) / 1000;
                 }
-                return elapsed;
+                return this.elapsedBeforePause;
             }
 
             startProgressTracking() {
@@ -1176,7 +1228,8 @@
 
                     // Stop at max duration
                     if (elapsed >= this.currentMaxDuration) {
-                        this.player.pauseVideo();
+                        try { this.player.pauseVideo(); } catch (e) {}
+                        try { this.player.seekTo(this.audioStartTime + this.currentMaxDuration, true); } catch (e) {}
                         this.elapsedBeforePause = this.currentMaxDuration;
                         this.isPlaying = false;
                         document.getElementById('play-pause-btn').textContent = 'Play';
