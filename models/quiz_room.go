@@ -18,6 +18,7 @@ type QuizRoom struct {
 	VotedOnly        bool      `gorm:"default:false"`
 	VotedRatio       *float64  `gorm:"default:null"`
 	CoversOnly       bool      `gorm:"default:false"`
+	OriginalsOnly    bool      `gorm:"default:false"`
 	FuzzyInput       bool      `gorm:"default:true"`         // use fuzzy search dropdowns vs free text
 	OneOfArtists     bool      `gorm:"default:false"`        // correct if at least one artist matches
 	FilterByGuessedArtist bool `gorm:"default:false"`        // when question_type=both, narrow title dropdown to songs by the guessed artist

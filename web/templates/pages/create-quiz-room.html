@@ -132,6 +132,14 @@
 
             <div class="form-group">
               <label class="checkbox-label">
+                <input type="checkbox" id="originals-only-filter" />
+                <span>Originals Only</span>
+              </label>
+              <p class="checkbox-description">Only include non-cover songs</p>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-label">
                 <input type="checkbox" id="fuzzy-input" checked />
                 <span>Fuzzy Search Input</span>
               </label>
@@ -213,6 +221,22 @@
             this.value === "fixed" ? "block" : "none";
         });
 
+      // Covers Only and Originals Only are mutually exclusive
+      document
+        .getElementById("covers-only-filter")
+        .addEventListener("change", function () {
+          if (this.checked) {
+            document.getElementById("originals-only-filter").checked = false;
+          }
+        });
+      document
+        .getElementById("originals-only-filter")
+        .addEventListener("change", function () {
+          if (this.checked) {
+            document.getElementById("covers-only-filter").checked = false;
+          }
+        });
+
       // Toggle voted ratio visibility
       document
         .getElementById("voted-only-filter")
@@ -242,6 +266,8 @@
           );
           const coversOnly =
             document.getElementById("covers-only-filter").checked;
+          const originalsOnly =
+            document.getElementById("originals-only-filter").checked;
           const fuzzyInput = document.getElementById("fuzzy-input").checked;
           const oneOfArtists =
             document.getElementById("one-of-artists").checked;
@@ -253,6 +279,7 @@
             quiz_style: quizStyle,
             fixed_time_limit: fixedTimeLimit,
             covers_only: coversOnly,
+            originals_only: originalsOnly,
             fuzzy_input: fuzzyInput,
             one_of_artists: oneOfArtists,
             filter_by_guessed_artist: filterByGuessedArtist,

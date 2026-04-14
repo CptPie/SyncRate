@@ -90,6 +90,7 @@ func PostCreateQuizRoom(db *gorm.DB) gin.HandlerFunc {
 			VotedOnly      bool     `json:"voted_only"`
 			VotedRatio     *float64 `json:"voted_ratio"`
 			CoversOnly     bool     `json:"covers_only"`
+			OriginalsOnly  bool     `json:"originals_only"`
 			FuzzyInput     bool     `json:"fuzzy_input"`
 			OneOfArtists   bool     `json:"one_of_artists"`
 			FilterByGuessedArtist bool `json:"filter_by_guessed_artist"`
@@ -122,7 +123,7 @@ func PostCreateQuizRoom(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		// Check song availability and generate warnings
-		songWarning := checkQuizSongAvailability(db, userID.(uint), requestBody.CategoryID, requestBody.VotedOnly, requestBody.VotedRatio, requestBody.CoversOnly, requestBody.MaxRounds)
+		songWarning := checkQuizSongAvailability(db, userID.(uint), requestBody.CategoryID, requestBody.VotedOnly, requestBody.VotedRatio, requestBody.CoversOnly, requestBody.OriginalsOnly, requestBody.MaxRounds)
 
 		roomID := generateQuizRoomCode()
 
@@ -137,6 +138,7 @@ func PostCreateQuizRoom(db *gorm.DB) gin.HandlerFunc {
 			VotedOnly:      requestBody.VotedOnly,
 			VotedRatio:     requestBody.VotedRatio,
 			CoversOnly:     requestBody.CoversOnly,
+			OriginalsOnly:  requestBody.OriginalsOnly,
 			FuzzyInput:     requestBody.FuzzyInput,
 			OneOfArtists:   requestBody.OneOfArtists,
 			FilterByGuessedArtist: requestBody.FilterByGuessedArtist,
@@ -215,6 +217,9 @@ func GetQuizRoom(db *gorm.DB) gin.HandlerFunc {
 			}
 			if room.CoversOnly {
 				query = query.Where("is_cover = ?", true)
+			}
+			if room.OriginalsOnly {
+				query = query.Where("is_cover = ?", false)
 			}
 			if room.FilterByGuessedArtist {
 				query = query.Preload("Artists").Preload("Units")
@@ -715,7 +720,7 @@ func handleQuizVoteUpdate(db *gorm.DB, roomID, userID string, data json.RawMessa
 // --- Song selection ---
 
 // checkQuizSongAvailability counts available songs and warns about ratio shortfalls
-func checkQuizSongAvailability(db *gorm.DB, userID uint, categoryID *uint, votedOnly bool, votedRatio *float64, coversOnly bool, maxRounds *int) string {
+func checkQuizSongAvailability(db *gorm.DB, userID uint, categoryID *uint, votedOnly bool, votedRatio *float64, coversOnly, originalsOnly bool, maxRounds *int) string {
 	// Count total available songs with filters
 	countQuery := func(baseQ *gorm.DB) int64 {
 		var count int64
@@ -725,6 +730,9 @@ func checkQuizSongAvailability(db *gorm.DB, userID uint, categoryID *uint, voted
 		}
 		if coversOnly {
 			q = q.Where("is_cover = ?", true)
+		}
+		if originalsOnly {
+			q = q.Where("is_cover = ?", false)
 		}
 		q.Count(&count)
 		return count
@@ -798,6 +806,9 @@ func selectQuizSong(db *gorm.DB, room *models.QuizRoom) *models.Song {
 		}
 		if room.CoversOnly {
 			q = q.Where("songs.is_cover = ?", true)
+		}
+		if room.OriginalsOnly {
+			q = q.Where("songs.is_cover = ?", false)
 		}
 		if len(usedSongIDs) > 0 {
 			q = q.Where("songs.song_id NOT IN ?", usedSongIDs)
