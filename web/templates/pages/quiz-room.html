@@ -101,11 +101,13 @@
         }
         .audio-progress-container {
             width: 100%;
-            height: 8px;
+            height: 10px;
             background: var(--bg-secondary);
             border-radius: 4px;
             overflow: hidden;
             margin: 15px 0;
+            cursor: pointer;
+            position: relative;
         }
         .audio-progress-bar {
             height: 100%;
@@ -663,6 +665,10 @@
 
                 document.getElementById('replay-btn').addEventListener('click', () => {
                     this.replayAudio();
+                });
+
+                document.getElementById('audio-progress').parentElement.addEventListener('click', (e) => {
+                    this.seekFromClick(e);
                 });
 
                 document.getElementById('submit-guess-btn').addEventListener('click', () => {
@@ -1302,6 +1308,30 @@
                 document.getElementById('play-pause-btn').disabled = false;
                 this.updateProgressBar();
                 this.startProgressTracking();
+            }
+
+            seekFromClick(e) {
+                if (!this.player || !this.playerReady) return;
+                if (!this.currentMaxDuration || this.currentMaxDuration <= 0) return;
+                const container = e.currentTarget;
+                const rect = container.getBoundingClientRect();
+                const frac = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                const target = Math.min(this.currentMaxDuration - 0.05, frac * this.currentMaxDuration);
+                const clampedTarget = Math.max(0, target);
+
+                try {
+                    this.player.seekTo(this.audioStartTime + clampedTarget, true);
+                } catch (err) {}
+
+                this.elapsedBeforePause = clampedTarget;
+                if (this.isPlaying) {
+                    this.playStartedAt = Date.now();
+                } else {
+                    // Re-enable play if we seeked back before the end cap
+                    document.getElementById('play-pause-btn').disabled = false;
+                }
+                this.updateProgressBar();
+                this.updateTimeDisplay(clampedTarget);
             }
 
             extractVideoId(embedUrl) {
