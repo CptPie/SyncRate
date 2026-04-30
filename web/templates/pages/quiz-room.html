@@ -1437,6 +1437,27 @@
                 this.sendMessage('set_ready', { ready: nowReady });
             }
 
+            isUserAutoReady(userId) {
+                const state = this.quizState;
+                if (!state) return false;
+                const round = state.current_round > 0 && state.rounds
+                    ? state.rounds[state.current_round - 1]
+                    : null;
+                if (!round || !round.user_guesses) return false;
+                const guess = round.user_guesses.find(g => g.user_id === userId);
+                if (!guess) return false;
+                const qt = state.question_type;
+                if (qt === 'both') return !!guess.title_correct && !!guess.artist_correct;
+                if (qt === 'title') return !!guess.title_correct;
+                if (qt === 'artist') return !!guess.artist_correct;
+                return false;
+            }
+
+            isUserReady(userId) {
+                const ready = (this.quizState && this.quizState.stage_ready) || {};
+                return !!ready[userId] || this.isUserAutoReady(userId);
+            }
+
             updateReadyUI() {
                 const btn = document.getElementById('ready-btn');
                 const count = document.getElementById('ready-count');
@@ -1456,21 +1477,27 @@
                     return;
                 }
 
+                const myId = this.getCurrentUserId();
+                const autoReady = this.isUserAutoReady(myId);
                 const ready = (state.stage_ready || {});
-                const iAmReady = !!ready[this.getCurrentUserId()];
-                btn.style.display = 'inline-block';
-                btn.textContent = iAmReady ? 'Unready' : 'Ready';
-                btn.classList.toggle('ready-active', iAmReady);
+                const iAmReady = !!ready[myId];
+
+                if (autoReady) {
+                    // Already guessed everything required — no need to manually ready up.
+                    btn.style.display = 'none';
+                } else {
+                    btn.style.display = 'inline-block';
+                    btn.textContent = iAmReady ? 'Unready' : 'Ready';
+                    btn.classList.toggle('ready-active', iAmReady);
+                }
 
                 const total = this.onlineUsers.length || 1;
-                const readyCount = this.onlineUsers.filter(u => ready[u.id]).length;
+                const readyCount = this.onlineUsers.filter(u => this.isUserReady(u.id)).length;
                 count.textContent = `${readyCount}/${total} ready`;
             }
 
             confirmIfNotReady({ title, question, okLabel, onConfirm }) {
-                const state = this.quizState;
-                const ready = (state && state.stage_ready) || {};
-                const notReady = this.onlineUsers.filter(u => !ready[u.id]);
+                const notReady = this.onlineUsers.filter(u => !this.isUserReady(u.id));
                 if (notReady.length === 0) {
                     onConfirm();
                     return;
