@@ -670,10 +670,8 @@
                             this.onAudioEnded();
                         },
                         onError: (code) => {
-                            console.error('Media player error:', code);
-                            this.isPlaying = false;
-                            try { this.player.destroy(); } catch (e) {}
-                            setTimeout(() => createPlayer(), 1000);
+                            console.error('Media player error:', code, '— reloading');
+                            window.location.reload();
                         },
                     });
                 };
