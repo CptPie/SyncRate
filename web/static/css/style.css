@@ -961,7 +961,8 @@ input[type="color"]:focus {
   overflow: hidden;
 }
 
-.video-container iframe {
+.video-container iframe,
+.video-container .media-audio-wrap {
   position: absolute;
   top: 0;
   left: 0;
