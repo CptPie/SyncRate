@@ -72,6 +72,13 @@
                 allowfullscreen>
               </iframe>
             </div>
+            {{else if .song.SourceURL}}
+            <div class="media-audio-wrap">
+              {{if .song.ThumbnailURL}}
+              <img src="{{.song.ThumbnailURL}}" alt="{{.song.NameOriginal}}" class="media-audio-thumbnail" />
+              {{end}}
+              <audio src="{{.song.SourceURL}}" controls preload="metadata" class="media-audio-element"></audio>
+            </div>
             {{end}}
           </div>
 

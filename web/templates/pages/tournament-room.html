@@ -514,7 +514,7 @@
     </div>
 
     <script src="/static/js/theme-toggle.js"></script>
-    <script src="https://www.youtube.com/iframe_api"></script>
+    <script src="/static/js/media-player.js"></script>
     <script>
         class TournamentRoom {
             constructor(roomId) {
@@ -787,7 +787,7 @@
                 const playerNum = data.player_num;
                 const player = playerNum === 1 ? this.player1 : this.player2;
 
-                if (!player) return;
+                if (!player || !player.isReady()) return;
 
                 const currentTime = player.getCurrentTime();
                 const timeDiff = Math.abs(currentTime - data.time);
@@ -798,11 +798,11 @@
                 }
 
                 // Sync play state
-                const playerState = player.getPlayerState();
-                if (data.is_playing && playerState !== YT.PlayerState.PLAYING) {
-                    player.playVideo();
-                } else if (!data.is_playing && playerState === YT.PlayerState.PLAYING) {
-                    player.pauseVideo();
+                const state = player.getState();
+                if (data.is_playing && state !== MediaPlayerState.PLAYING) {
+                    player.play();
+                } else if (!data.is_playing && state === MediaPlayerState.PLAYING) {
+                    player.pause();
                 }
             }
 
@@ -1435,81 +1435,38 @@
                     this.player2 = null;
                 }
 
-                // Clear video containers
-                document.getElementById('video-container-1').innerHTML = '<div id="video-player-1"></div>';
-                document.getElementById('video-container-2').innerHTML = '<div id="video-player-2"></div>';
+                // Reset video containers (the MediaPlayer fills them).
+                document.getElementById('video-container-1').innerHTML = '';
+                document.getElementById('video-container-2').innerHTML = '';
 
-                // Extract video IDs
-                const videoId1 = this.extractYouTubeId(match.song1.embed_url);
-                const videoId2 = this.extractYouTubeId(match.song2.embed_url);
-
-                // Initialize players when YouTube API is ready
-                if (videoId1) {
-                    this.initYouTubePlayer(1, videoId1);
+                if (match.song1 && match.song1.source_url) {
+                    this.player1 = this.makeMatchPlayer(1, match.song1);
                 }
-                if (videoId2) {
-                    this.initYouTubePlayer(2, videoId2);
+                if (match.song2 && match.song2.source_url) {
+                    this.player2 = this.makeMatchPlayer(2, match.song2);
                 }
             }
 
-            extractYouTubeId(url) {
-                if (!url) return null;
-                const match = url.match(/embed\/([^?]+)/);
-                return match ? match[1] : null;
-            }
-
-            initYouTubePlayer(playerNum, videoId) {
-                // Wait for YouTube API to be ready
-                if (typeof YT === 'undefined' || !YT.Player) {
-                    setTimeout(() => this.initYouTubePlayer(playerNum, videoId), 100);
-                    return;
-                }
-
-                const player = new YT.Player(`video-player-${playerNum}`, {
-                    videoId: videoId,
-                    playerVars: {
-                        autoplay: 0,
-                        controls: 1,
-                        modestbranding: 1,
-                        rel: 0
-                    },
-                    events: {
-                        onReady: (event) => {
-                            console.log(`Player ${playerNum} ready`);
-                        },
-                        onStateChange: (event) => {
-                            if (this.videoSyncEnabled) {
-                                this.onPlayerStateChange(playerNum, event);
-                            }
+            makeMatchPlayer(playerNum, song) {
+                return new MediaPlayer({
+                    containerId: `video-container-${playerNum}`,
+                    sourceURL: song.source_url,
+                    thumbnailURL: song.thumbnail_url,
+                    controls: true,
+                    autoplay: false,
+                    onStateChange: (state) => {
+                        if (!this.videoSyncEnabled) return;
+                        if (state === MediaPlayerState.PLAYING || state === MediaPlayerState.PAUSED) {
+                            const player = playerNum === 1 ? this.player1 : this.player2;
+                            if (!player) return;
+                            this.sendMessage('video_sync', {
+                                player_num: playerNum,
+                                time: player.getCurrentTime(),
+                                is_playing: state === MediaPlayerState.PLAYING,
+                            });
                         }
-                    }
+                    },
                 });
-
-                if (playerNum === 1) {
-                    this.player1 = player;
-                } else {
-                    this.player2 = player;
-                }
-            }
-
-            onPlayerStateChange(playerNum, event) {
-                // Broadcast video state if sync is enabled
-                if (!this.videoSyncEnabled) return;
-
-                const player = playerNum === 1 ? this.player1 : this.player2;
-                if (!player) return;
-
-                const time = player.getCurrentTime();
-                const isPlaying = event.data === YT.PlayerState.PLAYING;
-
-                // Only broadcast on actual play/pause
-                if (event.data === YT.PlayerState.PLAYING || event.data === YT.PlayerState.PAUSED) {
-                    this.sendMessage('video_sync', {
-                        player_num: playerNum,
-                        time: time,
-                        is_playing: isPlaying
-                    });
-                }
             }
 
             pickWinner(songNumber) {
@@ -1787,25 +1744,22 @@
                     });
                 } else {
                     // Reset video container for re-use
-                    document.getElementById('winner-video-container').innerHTML = '<div id="winner-video-player"></div>';
+                    document.getElementById('winner-video-container').innerHTML = '';
                 }
 
                 document.getElementById('tournament-winner-title').textContent = title;
                 document.getElementById('tournament-winner-reason').textContent = this.determineWinReason(match);
                 overlay.classList.add('active');
 
-                // Initialize winner video
-                const videoId = this.extractYouTubeId(winner.embed_url);
-                if (videoId && typeof YT !== 'undefined' && YT.Player) {
-                    this.winnerPlayer = new YT.Player('winner-video-player', {
-                        videoId: videoId,
+                if (winner && winner.source_url) {
+                    this.winnerPlayer = new MediaPlayer({
+                        containerId: 'winner-video-container',
+                        sourceURL: winner.source_url,
+                        thumbnailURL: winner.thumbnail_url,
+                        controls: true,
+                        autoplay: false,
                         width: '100%',
                         height: '100%',
-                        playerVars: {
-                            autoplay: 0,
-                            rel: 0,
-                            modestbranding: 1
-                        }
                     });
                 }
             }

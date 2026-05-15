@@ -112,7 +112,7 @@
 
     <script src="/static/js/theme-toggle.js"></script>
     <script src="/static/js/artist-colors.js"></script>
-    <script src="https://www.youtube.com/iframe_api"></script>
+    <script src="/static/js/media-player.js"></script>
     <script>
         class RatingRoom {
             constructor(roomId) {
@@ -366,28 +366,19 @@
                 }];
                 initializeAllColors(songData);
 
-                // Update video
-                if (data.embed_url) {
-                    const videoContainer = document.getElementById('video-container');
+                // Update media player
+                if (data.source_url) {
                     const noVideoElement = document.getElementById('no-video');
-
                     if (noVideoElement) {
                         noVideoElement.style.display = 'none';
                     }
 
-                    // Extract YouTube video ID from embed URL
-                    const videoId = this.extractYouTubeId(data.embed_url);
-
-                    // Clear old player if exists
                     if (this.player) {
                         this.player.destroy();
+                        this.player = null;
                     }
 
-                    // Create container for new player
-                    videoContainer.innerHTML = '<div id="video-player"></div>';
-
-                    // Initialize YouTube player
-                    this.initYouTubePlayer(videoId);
+                    this.initMediaPlayer(data.source_url, data.thumbnail_url);
                 }
 
                 // Show voting section
@@ -417,7 +408,7 @@
             }
 
             handleVideoSync(data) {
-                if (!this.player || this.isSyncing || !this.videoSyncEnabled) return;
+                if (!this.player || !this.player.isReady() || this.isSyncing || !this.videoSyncEnabled) return;
 
                 this.isSyncing = true;
 
@@ -430,12 +421,12 @@
                 }
 
                 // Sync play state
-                const playerState = this.player.getPlayerState();
-                if (data.is_playing && playerState !== YT.PlayerState.PLAYING) {
-                    this.player.playVideo();
+                const state = this.player.getState();
+                if (data.is_playing && state !== MediaPlayerState.PLAYING) {
+                    this.player.play();
                     this.userInteracted = true;
-                } else if (!data.is_playing && playerState === YT.PlayerState.PLAYING) {
-                    this.player.pauseVideo();
+                } else if (!data.is_playing && state === MediaPlayerState.PLAYING) {
+                    this.player.pause();
                 }
 
                 setTimeout(() => {
@@ -443,32 +434,21 @@
                 }, 200);
             }
 
-            initYouTubePlayer(videoId) {
-                // Wait for YouTube API to be ready
-                if (typeof YT === 'undefined' || !YT.Player) {
-                    setTimeout(() => this.initYouTubePlayer(videoId), 100);
-                    return;
-                }
-
-                this.player = new YT.Player('video-player', {
-                    videoId: videoId,
-                    playerVars: {
-                        autoplay: 1, // Enable autoplay
-                        controls: 1,
-                        modestbranding: 1,
-                        rel: 0
+            initMediaPlayer(sourceURL, thumbnailURL) {
+                this.player = new MediaPlayer({
+                    containerId: 'video-container',
+                    sourceURL: sourceURL,
+                    thumbnailURL: thumbnailURL,
+                    controls: true,
+                    autoplay: true,
+                    onReady: () => {
+                        this.setupPlayerListeners();
+                        this.player.play();
+                        this.userInteracted = true;
                     },
-                    events: {
-                        onReady: (event) => {
-                            this.setupPlayerListeners();
-                            // Autoplay the video when ready
-                            event.target.playVideo();
-                            this.userInteracted = true;
-                        },
-                        onStateChange: (event) => {
-                            this.onPlayerStateChange(event);
-                        }
-                    }
+                    onStateChange: (state) => {
+                        this.onPlayerStateChange(state);
+                    },
                 });
             }
 
@@ -479,39 +459,30 @@
                 }
 
                 this.syncInterval = setInterval(() => {
-                    if (this.player && !this.isSyncing && this.videoSyncEnabled) {
-                        const state = this.player.getPlayerState();
+                    if (this.player && this.player.isReady() && !this.isSyncing && this.videoSyncEnabled) {
+                        const state = this.player.getState();
                         const time = this.player.getCurrentTime();
 
                         this.sendMessage('video_sync', {
                             time: time,
-                            is_playing: state === YT.PlayerState.PLAYING
+                            is_playing: state === MediaPlayerState.PLAYING
                         });
                     }
                 }, 3000); // Sync every 3 seconds
             }
 
-            onPlayerStateChange(event) {
+            onPlayerStateChange(state) {
                 // Don't broadcast if we're currently syncing from another user or sync is disabled
                 if (this.isSyncing || !this.videoSyncEnabled) return;
-
-                const time = this.player.getCurrentTime();
-                const isPlaying = event.data === YT.PlayerState.PLAYING || event.data === YT.PlayerState.BUFFERING;
+                if (!this.player) return;
 
                 // Only broadcast on actual play/pause state changes
-                if (event.data === YT.PlayerState.PLAYING || event.data === YT.PlayerState.PAUSED) {
+                if (state === MediaPlayerState.PLAYING || state === MediaPlayerState.PAUSED) {
                     this.sendMessage('video_sync', {
-                        time: time,
-                        is_playing: event.data === YT.PlayerState.PLAYING
+                        time: this.player.getCurrentTime(),
+                        is_playing: state === MediaPlayerState.PLAYING
                     });
                 }
-            }
-
-            extractYouTubeId(url) {
-                // Extract video ID from YouTube embed URL
-                // Format: https://www.youtube.com/embed/VIDEO_ID
-                const match = url.match(/embed\/([^?]+)/);
-                return match ? match[1] : null;
             }
 
             handleVoteUpdate(data) {

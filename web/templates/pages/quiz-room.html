@@ -565,6 +565,7 @@
     </div>
 
     <script src="/static/js/theme-toggle.js"></script>
+    <script src="/static/js/media-player.js"></script>
     <script>
         // Song/artist data for fuzzy search (only loaded if fuzzy_input enabled)
         const songsData = JSON.parse('{{.songsJSON}}');
@@ -609,7 +610,6 @@
                 this.ws = null;
                 this.quizState = null;
                 this.player = null;
-                this.playerReady = false;
                 this.isPlaying = false;
                 this.progressInterval = null;
                 this.audioStartTime = 0;
@@ -625,7 +625,7 @@
                 this.filterArtistEntity = null;
 
                 this.initWebSocket();
-                this.initYouTubePlayer();
+                this.initMediaPlayer();
                 this.bindEvents();
                 this.setupGuessInputs();
             }
@@ -649,56 +649,35 @@
                 };
             }
 
-            initYouTubePlayer() {
+            initMediaPlayer() {
+                // The player container is offscreen (1×1) in quiz mode, so
+                // suppress controls and thumbnails — non-embed media must not
+                // leak visual clues about the song.
                 const createPlayer = () => {
-                    this.player = new YT.Player('youtube-player', {
-                        height: '1',
+                    this.player = new MediaPlayer({
+                        containerId: 'youtube-player-container',
+                        controls: false,
+                        showThumbnail: false,
                         width: '1',
-                        playerVars: {
-                            autoplay: 0,
-                            controls: 0,
-                            disablekb: 1,
-                            modestbranding: 1,
-                        },
-                        events: {
-                            onReady: () => {
-                                this.playerReady = true;
-                                console.log('YouTube player ready');
-                                if (this.pendingVideoId) {
-                                    const vid = this.pendingVideoId;
-                                    this.pendingVideoId = null;
-                                    this.cueCurrentVideo(vid);
-                                }
-                            },
-                            onStateChange: (event) => {
-                                if (event.data === YT.PlayerState.CUED) {
-                                    this.adjustStartForDuration();
-                                }
-                                if (event.data === YT.PlayerState.ENDED) {
-                                    this.onAudioEnded();
-                                }
-                            },
-                            onError: (event) => {
-                                console.error('YouTube player error:', event.data);
-                                // Recover: recreate the player element and reinitialize
-                                this.playerReady = false;
-                                this.isPlaying = false;
-                                const container = document.getElementById('youtube-player-container');
-                                container.innerHTML = '<div id="youtube-player"></div>';
-                                setTimeout(() => createPlayer(), 1000);
+                        height: '1',
+                        playerVars: { disablekb: 1 },
+                        onStateChange: (state) => {
+                            if (state === MediaPlayerState.CUED) {
+                                this.onMediaCued();
                             }
-                        }
+                        },
+                        onEnded: () => {
+                            this.onAudioEnded();
+                        },
+                        onError: (code) => {
+                            console.error('Media player error:', code);
+                            this.isPlaying = false;
+                            try { this.player.destroy(); } catch (e) {}
+                            setTimeout(() => createPlayer(), 1000);
+                        },
                     });
                 };
-
-                if (window.YT && window.YT.Player) {
-                    createPlayer();
-                } else {
-                    const tag = document.createElement('script');
-                    tag.src = 'https://www.youtube.com/iframe_api';
-                    document.head.appendChild(tag);
-                    window.onYouTubeIframeAPIReady = () => createPlayer();
-                }
+                createPlayer();
             }
 
             bindEvents() {
@@ -1197,47 +1176,40 @@
                 document.getElementById('title-past-guesses').innerHTML = '';
                 document.getElementById('artist-past-guesses').innerHTML = '';
 
-                if (!round.song || !round.song.embed_url) return;
+                const sourceURL = round.song && round.song.source_url;
+                if (!sourceURL) return;
 
                 this.audioStartTime = round.audio_start_time;
 
                 // Calculate max duration for current stage/mode
                 this.updateMaxDuration();
 
-                // Load video without auto-playing
-                const videoId = this.extractVideoId(round.song.embed_url);
-                if (videoId) {
-                    if (this.playerReady) {
-                        this.cueCurrentVideo(videoId);
-                    } else {
-                        // Player not ready yet — queue and flush from onReady
-                        this.pendingVideoId = videoId;
-                        document.getElementById('play-pause-btn').textContent = 'Loading...';
-                        document.getElementById('play-pause-btn').disabled = true;
-                        document.getElementById('replay-btn').disabled = true;
-                    }
-                }
+                // Show loading UI; the CUED callback re-enables play/replay.
+                document.getElementById('play-pause-btn').textContent = 'Loading...';
+                document.getElementById('play-pause-btn').disabled = true;
+                document.getElementById('replay-btn').disabled = true;
+
+                this.player.cue({
+                    sourceURL: sourceURL,
+                    startSeconds: this.audioStartTime,
+                });
 
                 this.updateProgressBar();
             }
 
-            cueCurrentVideo(videoId) {
-                this.player.cueVideoById({
-                    videoId: videoId,
-                    startSeconds: this.audioStartTime,
-                });
+            onMediaCued() {
                 this.isPlaying = false;
                 document.getElementById('play-pause-btn').textContent = 'Play';
                 document.getElementById('play-pause-btn').disabled = false;
                 document.getElementById('replay-btn').disabled = false;
+                this.adjustStartForDuration();
             }
 
             adjustStartForDuration() {
-                // When a freshly cued video reports its duration, make sure
+                // When the freshly cued track reports its duration, make sure
                 // our chosen start leaves enough room for the longest clip (60s).
-                if (!this.player || !this.playerReady) return;
-                let duration = 0;
-                try { duration = this.player.getDuration(); } catch (e) { return; }
+                if (!this.player) return;
+                const duration = this.player.getDuration();
                 if (!duration || duration <= 0) return;
                 const neededWindow = 60;
                 const safeEnd = Math.max(0, duration - 2);
@@ -1245,10 +1217,8 @@
                     const newStart = Math.max(0, safeEnd - neededWindow);
                     if (Math.abs(newStart - this.audioStartTime) > 0.5) {
                         this.audioStartTime = newStart;
-                        try {
-                            this.player.seekTo(newStart, true);
-                            this.player.pauseVideo();
-                        } catch (e) {}
+                        this.player.seekTo(newStart, true);
+                        this.player.pause();
                         this.elapsedBeforePause = 0;
                         this.updateProgressBar();
                         this.updateTimeDisplay(0);
@@ -1280,11 +1250,11 @@
             }
 
             togglePlayPause() {
-                if (!this.player || !this.playerReady) return;
+                if (!this.player || !this.player.isReady()) return;
 
                 if (this.isPlaying) {
                     const elapsedNow = this.getElapsedTime();
-                    this.player.pauseVideo();
+                    this.player.pause();
                     this.elapsedBeforePause = elapsedNow;
                     this.isPlaying = false;
                     document.getElementById('play-pause-btn').textContent = 'Play';
@@ -1298,7 +1268,7 @@
                     // Seek to correct position
                     const seekTo = this.audioStartTime + this.elapsedBeforePause;
                     this.player.seekTo(seekTo, true);
-                    this.player.playVideo();
+                    this.player.play();
                     this.playStartedAt = Date.now();
                     this.isPlaying = true;
                     document.getElementById('play-pause-btn').textContent = 'Pause';
@@ -1310,12 +1280,10 @@
                 // Prefer the player's actual playback position so the
                 // max-duration pause fires at the real audio boundary
                 // (wall-clock drifts when the player buffers).
-                if (this.isPlaying && this.player && this.playerReady) {
-                    try {
-                        const ct = this.player.getCurrentTime();
-                        const e = ct - this.audioStartTime;
-                        if (isFinite(e) && e >= 0 && e < 3600) return e;
-                    } catch (err) {}
+                if (this.isPlaying && this.player && this.player.isReady()) {
+                    const ct = this.player.getCurrentTime();
+                    const e = ct - this.audioStartTime;
+                    if (isFinite(e) && e >= 0 && e < 3600) return e;
                     return this.elapsedBeforePause + (Date.now() - this.playStartedAt) / 1000;
                 }
                 return this.elapsedBeforePause;
@@ -1330,8 +1298,8 @@
 
                     // Stop at max duration
                     if (elapsed >= this.currentMaxDuration) {
-                        try { this.player.pauseVideo(); } catch (e) {}
-                        try { this.player.seekTo(this.audioStartTime + this.currentMaxDuration, true); } catch (e) {}
+                        this.player.pause();
+                        this.player.seekTo(this.audioStartTime + this.currentMaxDuration, true);
                         this.elapsedBeforePause = this.currentMaxDuration;
                         this.isPlaying = false;
                         document.getElementById('play-pause-btn').textContent = 'Play';
@@ -1369,8 +1337,8 @@
 
             stopAudio() {
                 this.stopProgressTracking();
-                if (this.player && this.playerReady) {
-                    try { this.player.pauseVideo(); } catch (e) {}
+                if (this.player && this.player.isReady()) {
+                    this.player.pause();
                 }
                 this.isPlaying = false;
                 this.elapsedBeforePause = 0;
@@ -1384,19 +1352,19 @@
             }
 
             replayAudio() {
-                if (!this.player || !this.playerReady) return;
+                if (!this.player || !this.player.isReady()) return;
 
                 // Reset elapsed time and seek back to start of clip
                 this.stopProgressTracking();
                 if (this.isPlaying) {
-                    this.player.pauseVideo();
+                    this.player.pause();
                 }
                 this.elapsedBeforePause = 0;
                 this.playStartedAt = 0;
                 this.isPlaying = false;
 
                 this.player.seekTo(this.audioStartTime, true);
-                this.player.playVideo();
+                this.player.play();
                 this.playStartedAt = Date.now();
                 this.isPlaying = true;
 
@@ -1407,7 +1375,7 @@
             }
 
             seekFromClick(e) {
-                if (!this.player || !this.playerReady) return;
+                if (!this.player || !this.player.isReady()) return;
                 if (!this.currentMaxDuration || this.currentMaxDuration <= 0) return;
                 const container = e.currentTarget;
                 const rect = container.getBoundingClientRect();
@@ -1415,9 +1383,7 @@
                 const target = Math.min(this.currentMaxDuration - 0.05, frac * this.currentMaxDuration);
                 const clampedTarget = Math.max(0, target);
 
-                try {
-                    this.player.seekTo(this.audioStartTime + clampedTarget, true);
-                } catch (err) {}
+                this.player.seekTo(this.audioStartTime + clampedTarget, true);
 
                 this.elapsedBeforePause = clampedTarget;
                 if (this.isPlaying) {
@@ -1547,11 +1513,6 @@
                     }
                     return false;
                 });
-            }
-
-            extractVideoId(embedUrl) {
-                const match = embedUrl.match(/\/embed\/([^?]+)/);
-                return match ? match[1] : null;
             }
 
             // --- Guessing ---
@@ -1697,13 +1658,27 @@
                     html += `</div>`;
                 }
 
-                // Video embed
-                if (song.embed_url) {
-                    html += `
-                        <div class="results-video">
-                            <iframe src="${song.embed_url}?autoplay=0" allowfullscreen></iframe>
-                        </div>
-                    `;
+                // Media embed: YouTube → iframe, direct media → audio + thumbnail.
+                if (song.source_url) {
+                    if (isYouTubeURL(song.source_url) && song.embed_url) {
+                        html += `
+                            <div class="results-video">
+                                <iframe src="${song.embed_url}?autoplay=0" allowfullscreen></iframe>
+                            </div>
+                        `;
+                    } else {
+                        const thumb = song.thumbnail_url
+                            ? `<img src="${song.thumbnail_url}" alt="" class="media-audio-thumbnail" />`
+                            : '';
+                        html += `
+                            <div class="results-video">
+                                <div class="media-audio-wrap">
+                                    ${thumb}
+                                    <audio src="${song.source_url}" controls preload="metadata" class="media-audio-element"></audio>
+                                </div>
+                            </div>
+                        `;
+                    }
                 }
 
                 // Vote/rating section
