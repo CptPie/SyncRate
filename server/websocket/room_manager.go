@@ -94,6 +94,7 @@ type SongChangeData struct {
 	SongID            uint              `json:"song_id"`
 	SongTitleOriginal string            `json:"song_title_original"`
 	SongTitleEnglish  string            `json:"song_title_english"`
+	SourceURL         string            `json:"source_url"`
 	EmbedURL          string            `json:"embed_url"`
 	ThumbnailURL      string            `json:"thumbnail_url"`
 	Artists           []ArtistData      `json:"artists"`
