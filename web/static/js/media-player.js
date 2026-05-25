@@ -34,6 +34,21 @@
         return null;
     }
 
+    const VOLUME_STORAGE_KEY = 'syncrate-volume';
+    function loadPersistedVolume() {
+        try {
+            const raw = window.localStorage && window.localStorage.getItem(VOLUME_STORAGE_KEY);
+            const n = parseFloat(raw);
+            if (!isNaN(n) && n >= 0 && n <= 150) return n;
+        } catch (e) {}
+        return 100;
+    }
+    function savePersistedVolume(pct) {
+        try {
+            if (window.localStorage) window.localStorage.setItem(VOLUME_STORAGE_KEY, String(pct));
+        } catch (e) {}
+    }
+
     let ytApiPromise = null;
     function ensureYouTubeAPI() {
         if (window.YT && window.YT.Player) return Promise.resolve();
@@ -75,6 +90,16 @@
             this.ready = false;
             this.destroyed = false;
             this._pendingCue = null;
+            // Volume in 0-150% range. YT clamps to 100; native audio uses a
+            // Web Audio GainNode to boost above 100. Defaults to whatever is
+            // persisted in localStorage so every room starts at the user's
+            // preferred level. Pass opts.volume to override.
+            this._volumePct = typeof opts.volume === 'number'
+                ? Math.max(0, Math.min(150, opts.volume))
+                : loadPersistedVolume();
+            this._audioCtx = null;
+            this._gainNode = null;
+            this._audioSource = null;
             this.isYouTube = isYouTubeURL(this.sourceURL);
             if (this.sourceURL) {
                 this._build();
@@ -113,6 +138,7 @@
                     events: {
                         onReady: () => {
                             this.ready = true;
+                            this._applyVolume();
                             if (this.onReady) this.onReady();
                             if (this._pendingCue) {
                                 const c = this._pendingCue;
@@ -162,6 +188,7 @@
                 if (this.destroyed) return;
                 if (!this.ready) {
                     this.ready = true;
+                    this._applyVolume();
                     if (this.onReady) this.onReady();
                     if (this.onStateChange) this.onStateChange(PLAYER_STATE.CUED);
                     if (this._pendingCue) {
@@ -265,8 +292,76 @@
                     try { this._yt.playVideo(); } catch (e) {}
                 }
             } else if (this._audio) {
+                // Browsers auto-suspend the AudioContext until a gesture.
+                // Calling play() is itself a gesture, so resume here.
+                if (this._audioCtx && this._audioCtx.state === 'suspended') {
+                    try { this._audioCtx.resume(); } catch (e) {}
+                }
                 const p = this._audio.play();
                 if (p && typeof p.catch === 'function') p.catch(() => {});
+            }
+        }
+
+        // pct is 0-150. Cached so it can be applied once the player becomes
+        // ready, or re-applied after a backend switch destroys the audio
+        // element.
+        setVolume(pct) {
+            const v = Math.max(0, Math.min(150, Number(pct) || 0));
+            this._volumePct = v;
+            if (!this.ready) return;
+            this._applyVolume();
+        }
+
+        getVolume() {
+            return this._volumePct != null ? this._volumePct : 100;
+        }
+
+        _applyVolume() {
+            if (this._volumePct == null) return;
+            const pct = this._volumePct;
+            if (this.isYouTube) {
+                if (this._yt) {
+                    try { this._yt.setVolume(Math.min(100, pct)); } catch (e) {}
+                }
+                return;
+            }
+            if (!this._audio) return;
+            const ratio = pct / 100;
+            if (ratio > 1) {
+                this._ensureGainGraph();
+                if (this._gainNode) {
+                    this._gainNode.gain.value = ratio;
+                    this._audio.volume = 1;
+                } else {
+                    // No Web Audio support: silently clamp at 100%.
+                    this._audio.volume = 1;
+                }
+            } else if (this._gainNode) {
+                // Graph already wired up from an earlier boost; keep using it.
+                this._gainNode.gain.value = ratio;
+                this._audio.volume = 1;
+            } else {
+                this._audio.volume = ratio;
+            }
+        }
+
+        _ensureGainGraph() {
+            if (this._gainNode || !this._audio) return;
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return;
+            try {
+                if (!this._audioCtx) this._audioCtx = new AC();
+                // createMediaElementSource can only be called once per
+                // element; we rebuild on backend switch via _teardown.
+                const source = this._audioCtx.createMediaElementSource(this._audio);
+                const gain = this._audioCtx.createGain();
+                source.connect(gain);
+                gain.connect(this._audioCtx.destination);
+                this._audioSource = source;
+                this._gainNode = gain;
+            } catch (e) {
+                this._audioSource = null;
+                this._gainNode = null;
             }
         }
 
@@ -329,6 +424,17 @@
                 this._audio.src = '';
                 this._audio = null;
             }
+            // The Web Audio source is bound to the audio element we just
+            // dropped — release it so the next backend can build a fresh
+            // graph. The AudioContext itself is kept for reuse.
+            if (this._audioSource) {
+                try { this._audioSource.disconnect(); } catch (e) {}
+                this._audioSource = null;
+            }
+            if (this._gainNode) {
+                try { this._gainNode.disconnect(); } catch (e) {}
+                this._gainNode = null;
+            }
             const container = this._container();
             if (container) container.innerHTML = '';
             this.ready = false;
@@ -337,10 +443,16 @@
         destroy() {
             this.destroyed = true;
             this._teardown();
+            if (this._audioCtx) {
+                try { this._audioCtx.close(); } catch (e) {}
+                this._audioCtx = null;
+            }
         }
     }
 
     window.MediaPlayer = MediaPlayer;
     window.MediaPlayerState = PLAYER_STATE;
     window.isYouTubeURL = isYouTubeURL;
+    window.loadPersistedVolume = loadPersistedVolume;
+    window.savePersistedVolume = savePersistedVolume;
 })();

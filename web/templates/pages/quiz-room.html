@@ -170,6 +170,28 @@
             color: var(--text-secondary);
             min-width: 80px;
         }
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 10px;
+        }
+        .volume-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        .volume-slider {
+            width: 110px;
+            cursor: pointer;
+            accent-color: var(--accent-primary);
+        }
+        .volume-value {
+            font-size: 13px;
+            color: var(--text-secondary);
+            min-width: 42px;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
         .stage-info {
             margin-top: 10px;
             color: var(--text-secondary);
@@ -512,6 +534,11 @@
                         <button id="ready-btn" style="display: none;">Ready</button>
                         <span class="ready-count" id="ready-count"></span>
                         <div class="audio-time-display" id="audio-time">0:00 / 0:00</div>
+                        <div class="volume-control">
+                            <label for="volume-slider" class="volume-label">Vol</label>
+                            <input type="range" id="volume-slider" min="0" max="150" value="100" class="volume-slider" />
+                            <span class="volume-value" id="volume-value">100%</span>
+                        </div>
                     </div>
                     <div class="stage-info" id="stage-info"></div>
                 </div>
@@ -633,6 +660,26 @@
                 this.initMediaPlayer();
                 this.bindEvents();
                 this.setupGuessInputs();
+                this.setupVolume();
+            }
+
+            setupVolume() {
+                const slider = document.getElementById('volume-slider');
+                const display = document.getElementById('volume-value');
+                if (!slider || !display) return;
+
+                // MediaPlayer already initialized itself from the persisted
+                // value; mirror that into the slider so the UI matches.
+                const initial = window.loadPersistedVolume ? window.loadPersistedVolume() : 100;
+                slider.value = initial;
+                display.textContent = `${Math.round(initial)}%`;
+
+                slider.addEventListener('input', (e) => {
+                    const v = parseFloat(e.target.value);
+                    display.textContent = `${Math.round(v)}%`;
+                    if (window.savePersistedVolume) window.savePersistedVolume(v);
+                    if (this.player) this.player.setVolume(v);
+                });
             }
 
             initWebSocket() {
