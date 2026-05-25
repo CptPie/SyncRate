@@ -623,6 +623,11 @@
                 this.existingVotes = {};
                 this.onlineUsers = [];
                 this.filterArtistEntity = null;
+                // Lockout that suppresses replay/play clicks until the YT
+                // player confirms PLAYING. Prevents rapid clicks from
+                // stacking seekTo+play commands on the IFrame API.
+                this._seekBusy = false;
+                this._seekUnlockTimer = null;
 
                 this.initWebSocket();
                 this.initMediaPlayer();
@@ -664,6 +669,8 @@
                         onStateChange: (state) => {
                             if (state === MediaPlayerState.CUED) {
                                 this.onMediaCued();
+                            } else if (state === MediaPlayerState.PLAYING) {
+                                this._endSeekLockout();
                             }
                         },
                         onEnded: () => {
@@ -1154,6 +1161,7 @@
 
             startRoundAudio(round) {
                 this.stopAudio();
+                this._endSeekLockout();
                 this.titleCorrect = false;
                 this.artistCorrect = false;
                 this.filterArtistEntity = null;
@@ -1262,10 +1270,13 @@
                     if (this.elapsedBeforePause >= this.currentMaxDuration) {
                         return; // Can't play more
                     }
+                    if (this._seekBusy) return;
+                    this._beginSeekLockout();
 
-                    // Seek to correct position
+                    // allowSeekAhead=false: seek inside the already-buffered
+                    // range instead of forcing a refetch.
                     const seekTo = this.audioStartTime + this.elapsedBeforePause;
-                    this.player.seekTo(seekTo, true);
+                    this.player.seekTo(seekTo, false);
                     this.player.play();
                     this.playStartedAt = Date.now();
                     this.isPlaying = true;
@@ -1294,10 +1305,10 @@
                     this.updateProgressBar();
                     this.updateTimeDisplay(elapsed);
 
-                    // Stop at max duration
+                    // Stop at max duration. Just pause — no seek. A seek
+                    // here forced YT to refetch the next segment every cycle.
                     if (elapsed >= this.currentMaxDuration) {
                         this.player.pause();
-                        this.player.seekTo(this.audioStartTime + this.currentMaxDuration, true);
                         this.elapsedBeforePause = this.currentMaxDuration;
                         this.isPlaying = false;
                         document.getElementById('play-pause-btn').textContent = 'Play';
@@ -1351,6 +1362,8 @@
 
             replayAudio() {
                 if (!this.player || !this.player.isReady()) return;
+                if (this._seekBusy) return;
+                this._beginSeekLockout();
 
                 // Reset elapsed time and seek back to start of clip
                 this.stopProgressTracking();
@@ -1361,15 +1374,44 @@
                 this.playStartedAt = 0;
                 this.isPlaying = false;
 
-                this.player.seekTo(this.audioStartTime, true);
+                // allowSeekAhead=false: stay inside YT's existing buffer
+                // instead of forcing a refetch on every replay click.
+                this.player.seekTo(this.audioStartTime, false);
                 this.player.play();
                 this.playStartedAt = Date.now();
                 this.isPlaying = true;
 
                 document.getElementById('play-pause-btn').textContent = 'Pause';
-                document.getElementById('play-pause-btn').disabled = false;
                 this.updateProgressBar();
                 this.startProgressTracking();
+            }
+
+            _beginSeekLockout() {
+                this._seekBusy = true;
+                const replayBtn = document.getElementById('replay-btn');
+                const playPauseBtn = document.getElementById('play-pause-btn');
+                if (replayBtn) replayBtn.disabled = true;
+                if (playPauseBtn) playPauseBtn.disabled = true;
+                if (this._seekUnlockTimer) clearTimeout(this._seekUnlockTimer);
+                // Safety net: if PLAYING never arrives (error, blocked tab),
+                // release the lockout so the UI doesn't stay frozen.
+                this._seekUnlockTimer = setTimeout(() => this._endSeekLockout(), 800);
+            }
+
+            _endSeekLockout() {
+                this._seekBusy = false;
+                if (this._seekUnlockTimer) {
+                    clearTimeout(this._seekUnlockTimer);
+                    this._seekUnlockTimer = null;
+                }
+                const replayBtn = document.getElementById('replay-btn');
+                const playPauseBtn = document.getElementById('play-pause-btn');
+                if (replayBtn) replayBtn.disabled = false;
+                // Respect the max-duration cutoff: don't re-enable play if
+                // the clip has already been fully played.
+                if (playPauseBtn && this.elapsedBeforePause < this.currentMaxDuration) {
+                    playPauseBtn.disabled = false;
+                }
             }
 
             seekFromClick(e) {
