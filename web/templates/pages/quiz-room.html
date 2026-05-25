@@ -1320,10 +1320,8 @@
                     if (this._seekBusy) return;
                     this._beginSeekLockout();
 
-                    // allowSeekAhead=false: seek inside the already-buffered
-                    // range instead of forcing a refetch.
                     const seekTo = this.audioStartTime + this.elapsedBeforePause;
-                    this.player.seekTo(seekTo, false);
+                    this.player.seekTo(seekTo, true);
                     this.player.play();
                     this.playStartedAt = Date.now();
                     this.isPlaying = true;
@@ -1335,8 +1333,13 @@
             getElapsedTime() {
                 // Prefer the player's actual playback position so the
                 // max-duration pause fires at the real audio boundary
-                // (wall-clock drifts when the player buffers).
+                // (wall-clock drifts when the player buffers). While a
+                // seek is pending, YT's getCurrentTime() lags behind the
+                // new position, so trust wall-clock until PLAYING confirms.
                 if (this.isPlaying && this.player && this.player.isReady()) {
+                    if (this._seekBusy) {
+                        return this.elapsedBeforePause + (Date.now() - this.playStartedAt) / 1000;
+                    }
                     const ct = this.player.getCurrentTime();
                     const e = ct - this.audioStartTime;
                     if (isFinite(e) && e >= 0 && e < 3600) return e;
@@ -1421,9 +1424,7 @@
                 this.playStartedAt = 0;
                 this.isPlaying = false;
 
-                // allowSeekAhead=false: stay inside YT's existing buffer
-                // instead of forcing a refetch on every replay click.
-                this.player.seekTo(this.audioStartTime, false);
+                this.player.seekTo(this.audioStartTime, true);
                 this.player.play();
                 this.playStartedAt = Date.now();
                 this.isPlaying = true;
