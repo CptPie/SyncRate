@@ -51,7 +51,7 @@
                   </form>
                 {{else}}
                   <form action="/admin/users/{{.UserID}}/promote" method="POST" style="display: inline;">
-                    <button type="submit" class="btn-primary">Promote to Admin</button>
+                    <button type="submit" class="btn-secondary">Promote to Admin</button>
                   </form>
                 {{end}}
                 <form action="/admin/users/{{.UserID}}/reset-password" method="POST" style="display: inline;">
