@@ -18,12 +18,13 @@ func GetAdmin(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		log.Println("GetAdmin: Loading admin panel")
 
-		var categoryCount, unitCount, artistCount, albumCount, songCount int64
+		var categoryCount, unitCount, artistCount, albumCount, songCount, userCount int64
 		db.Model(&models.Category{}).Count(&categoryCount)
 		db.Model(&models.Unit{}).Count(&unitCount)
 		db.Model(&models.Artist{}).Count(&artistCount)
 		db.Model(&models.Album{}).Count(&albumCount)
 		db.Model(&models.Song{}).Count(&songCount)
+		db.Model(&models.User{}).Count(&userCount)
 
 		templateData := GetUserContext(c)
 		templateData["title"] = "SyncRate | Admin Panel"
@@ -32,6 +33,7 @@ func GetAdmin(db *gorm.DB) gin.HandlerFunc {
 		templateData["artistCount"] = artistCount
 		templateData["albumCount"] = albumCount
 		templateData["songCount"] = songCount
+		templateData["userCount"] = userCount
 
 		c.HTML(http.StatusOK, "admin-index.html", templateData)
 	}
@@ -1446,5 +1448,87 @@ func PostDeleteAlbum(db *gorm.DB) gin.HandlerFunc {
 		tx.Commit()
 		log.Printf("PostDeleteAlbum: Successfully deleted album with ID %d", id)
 		c.Redirect(http.StatusSeeOther, "/admin/albums")
+	}
+}
+
+// View Users page — lists all users and their admin status so an admin can
+// promote/demote others.
+func GetViewUsers(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log.Println("GetViewUsers: Loading view users page")
+
+		var users []models.User
+		db.Order("user_id").Find(&users)
+
+		templateData := GetUserContext(c)
+		templateData["title"] = "SyncRate | View Users"
+		templateData["users"] = users
+		templateData["isAdminPage"] = true
+		// Used by the template to suppress the demote button on your own row.
+		if currentUserID, ok := c.Get("user_id"); ok {
+			if id, ok := currentUserID.(uint); ok {
+				templateData["currentUserID"] = id
+			}
+		}
+
+		c.HTML(http.StatusOK, "view-users.html", templateData)
+	}
+}
+
+// setUserAdmin is the shared promote/demote logic.
+func setUserAdmin(db *gorm.DB, c *gin.Context, makeAdmin bool) {
+	idParam := c.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 32)
+	if err != nil {
+		log.Printf("setUserAdmin: Invalid user ID format: %v", err)
+		c.HTML(http.StatusBadRequest, "error.html", gin.H{
+			"error": "Invalid user ID: " + err.Error(),
+		})
+		return
+	}
+
+	// Guard against an admin removing their own admin rights and locking
+	// themselves out.
+	if !makeAdmin {
+		if currentUserID, ok := c.Get("user_id"); ok {
+			if cur, ok := currentUserID.(uint); ok && cur == uint(id) {
+				c.HTML(http.StatusBadRequest, "error.html", gin.H{
+					"error": "You cannot remove your own admin rights",
+				})
+				return
+			}
+		}
+	}
+
+	result := db.Model(&models.User{}).Where("user_id = ?", uint(id)).Update("is_admin", makeAdmin)
+	if result.Error != nil {
+		log.Printf("setUserAdmin: Error updating user %d: %v", id, result.Error)
+		c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+			"error": "Failed to update user: " + result.Error.Error(),
+		})
+		return
+	}
+	if result.RowsAffected == 0 {
+		c.HTML(http.StatusNotFound, "error.html", gin.H{
+			"error": "User not found",
+		})
+		return
+	}
+
+	log.Printf("setUserAdmin: Set is_admin=%v for user ID %d", makeAdmin, id)
+	c.Redirect(http.StatusSeeOther, "/admin/users")
+}
+
+// Promote a user to admin
+func PostPromoteUser(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		setUserAdmin(db, c, true)
+	}
+}
+
+// Demote a user from admin
+func PostDemoteUser(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		setUserAdmin(db, c, false)
 	}
 }

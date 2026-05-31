@@ -5,5 +5,8 @@
 SyncRate
 syncrate
 
+# Secrets
+.env
+
 .claude
 scripts

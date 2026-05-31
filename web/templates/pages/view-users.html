@@ -1,0 +1,79 @@
+{{define "view-users.html"}}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{.title}}</title>
+    <link href="/static/css/style.css" rel="stylesheet" />
+    <style>
+      .badge {
+        display: inline-block;
+        margin-left: 0.4rem;
+        padding: 0.1rem 0.5rem;
+        font-size: 0.7rem;
+        font-weight: 600;
+        line-height: 1.4;
+        vertical-align: middle;
+        border-radius: 999px;
+        background: var(--accent-color, #4f46e5);
+        color: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      {{template "header" .}}
+      <main>
+        <div class="admin-header">
+          <h2>Manage Users</h2>
+          <a href="/admin" class="btn-secondary">← Back to Admin</a>
+        </div>
+
+        {{if .users}}
+        <div class="view-grid" id="users-container">
+          {{range .users}}
+          <div class="view-card" data-id="{{.UserID}}">
+            <div class="view-card-header">
+              <h3>
+                {{.Username}}
+                {{if .IsAdmin}}<span class="badge">Admin</span>{{end}}
+                {{if eq .UserID $.currentUserID}}<span class="badge">You</span>{{end}}
+              </h3>
+              <div class="view-card-actions">
+                {{if eq .UserID $.currentUserID}}
+                  <button class="btn-secondary" disabled title="You cannot change your own admin rights">
+                    {{if .IsAdmin}}Demote{{else}}Promote{{end}}
+                  </button>
+                {{else if .IsAdmin}}
+                  <form action="/admin/users/{{.UserID}}/demote" method="POST" style="display: inline;">
+                    <button type="submit" class="btn-danger">Demote</button>
+                  </form>
+                {{else}}
+                  <form action="/admin/users/{{.UserID}}/promote" method="POST" style="display: inline;">
+                    <button type="submit" class="btn-primary">Promote to Admin</button>
+                  </form>
+                {{end}}
+              </div>
+            </div>
+            <div class="view-card-details">
+              <p><strong>ID:</strong> {{.UserID}}</p>
+              <p><strong>Email:</strong> {{.Email}}</p>
+              <p><strong>Role:</strong> {{if .IsAdmin}}Admin{{else}}User{{end}}</p>
+              <p><strong>Created:</strong> {{.CreatedAt.Format "2006-01-02 15:04"}}</p>
+            </div>
+          </div>
+          {{end}}
+        </div>
+        {{else}}
+        <div class="empty-state">
+          <p>No users found.</p>
+        </div>
+        {{end}}
+      </main>
+    </div>
+
+    <script src="/static/js/theme-toggle.js"></script>
+  </body>
+</html>
+{{end}}

@@ -164,6 +164,11 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		admin.GET("/view-songs", handlers.GetViewSongs(db))
 		admin.GET("/albums", handlers.GetViewAlbums(db))
 
+		// User management
+		admin.GET("/users", handlers.GetViewUsers(db))
+		admin.POST("/users/:id/promote", handlers.PostPromoteUser(db))
+		admin.POST("/users/:id/demote", handlers.PostDemoteUser(db))
+
 		// Edit routes
 		admin.POST("/categories/:id/edit", handlers.PostEditCategory(db))
 		admin.POST("/units/:id/edit", handlers.PostEditUnit(db))
