@@ -43,6 +43,9 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:?set ADMIN_USERNAME}
       # Only send session cookie over HTTPS (false for local http dev)
       COOKIE_SECURE: "true"
+      # Optional: absolute base for password-reset links. Derived from the
+      # request host when empty.
+      APP_BASE_URL: ${APP_BASE_URL:-}
     ports:
       - "8080:8080"
     volumes:

@@ -1726,6 +1726,23 @@ input[type="color"]:focus {
   --error-border: #553333;
 }
 
+.success-message {
+  background-color: var(--success-bg, #e6f9ed);
+  color: var(--success-text, #1a7f43);
+  border: 1px solid var(--success-border, #b7e4c7);
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  display: block;
+}
+
+[data-theme="dark"] .success-message {
+  --success-bg: #14271b;
+  --success-text: #5fd68a;
+  --success-border: #2f5a3f;
+}
+
 .warning-message {
   background-color: var(--warning-bg, #fff8e1);
   color: var(--warning-text, #856404);

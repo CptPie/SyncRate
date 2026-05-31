@@ -32,6 +32,9 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:?set ADMIN_USERNAME}
       # Served over HTTPS in production
       COOKIE_SECURE: "true"
+      # Absolute base for password-reset links (recommended behind a proxy);
+      # falls back to the request host when empty.
+      APP_BASE_URL: ${APP_BASE_URL:-}
     ports:
       - "8080:8080"
     # No volumes needed for production

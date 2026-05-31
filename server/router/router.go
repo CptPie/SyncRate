@@ -72,6 +72,10 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	r.POST("/register", handlers.PostRegister(db))
 	r.POST("/logout", handlers.PostLogout(db))
 
+	// Password reset (token in the URL is the credential; no session needed)
+	r.GET("/reset/:token", handlers.GetResetPassword(db))
+	r.POST("/reset/:token", handlers.PostResetPassword(db))
+
 	// Rating room routes
 	r.GET("/create-rating-room", handlers.GetCreateRatingRoom(db))
 	r.POST("/create-rating-room", handlers.PostCreateRatingRoom(db))
@@ -168,6 +172,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		admin.GET("/users", handlers.GetViewUsers(db))
 		admin.POST("/users/:id/promote", handlers.PostPromoteUser(db))
 		admin.POST("/users/:id/demote", handlers.PostDemoteUser(db))
+		admin.POST("/users/:id/reset-password", handlers.PostAdminResetPassword(db))
 
 		// Edit routes
 		admin.POST("/categories/:id/edit", handlers.PostEditCategory(db))

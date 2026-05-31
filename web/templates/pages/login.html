@@ -10,6 +10,9 @@
         <main>
             <div class="form-container">
                 <h2>Login</h2>
+                {{if .success}}
+                    <div class="success-message">{{.success}}</div>
+                {{end}}
                 {{if .error}}
                     <div class="error-message">{{.error}}</div>
                 {{end}}

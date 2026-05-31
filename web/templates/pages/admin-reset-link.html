@@ -1,0 +1,41 @@
+{{define "admin-reset-link.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {{template "head" .}}
+</head>
+<body>
+    <div class="container">
+        {{template "header" .}}
+        <main>
+            <div class="admin-header">
+                <h2>Password Reset Link</h2>
+                <a href="/admin/users" class="btn-secondary">← Back to Users</a>
+            </div>
+
+            <div class="success-message">
+                Reset link generated for <strong>{{.resetUser}}</strong>. Give it to them
+                directly — it works once and expires at <strong>{{.expiresAt}}</strong>.
+            </div>
+
+            <div class="form-group">
+                <label for="reset-link" class="form-label">Reset link:</label>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="text" id="reset-link" class="form-input" value="{{.resetURL}}" readonly
+                           onclick="this.select()" style="flex: 1;">
+                    <button type="button" class="btn-primary" onclick="copyResetLink()">Copy</button>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="/static/js/theme-toggle.js"></script>
+    <script>
+      function copyResetLink() {
+        const input = document.getElementById('reset-link');
+        input.select();
+        navigator.clipboard.writeText(input.value).catch(() => document.execCommand('copy'));
+      }
+    </script>
+</body>
+</html>
+{{end}}

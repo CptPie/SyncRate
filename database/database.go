@@ -52,6 +52,13 @@ func (db *Database) Migrate() error {
 	}
 	fmt.Println("✓ User table migrated successfully")
 
+	fmt.Println("Starting migration for PasswordResetToken table...")
+	err = db.DB.AutoMigrate(&models.PasswordResetToken{})
+	if err != nil {
+		return fmt.Errorf("migration failed for PasswordResetToken: %s", err.Error())
+	}
+	fmt.Println("✓ PasswordResetToken table migrated successfully")
+
 	fmt.Println("Starting migration for Unit table...")
 	err = db.DB.AutoMigrate(&models.Unit{})
 	if err != nil {
