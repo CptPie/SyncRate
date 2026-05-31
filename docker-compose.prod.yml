@@ -5,7 +5,7 @@ services:
     restart: always
     environment:
       POSTGRES_USER: SyncRate
-      POSTGRES_PASSWORD: superSecret123
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD}
       POSTGRES_DB: SyncRate
     ports:
       - "5432:5432"
@@ -24,8 +24,14 @@ services:
       DB_HOST: db
       DB_PORT: 5432
       DB_USER: SyncRate
-      DB_PASSWORD: superSecret123
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD}
       DB_NAME: SyncRate
+      # Secrets supplied from the host environment / .env file — do not hardcode
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}
+      API_KEY: ${API_KEY:?set API_KEY}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:?set ADMIN_USERNAME}
+      # Served over HTTPS in production
+      COOKIE_SECURE: "true"
     ports:
       - "8080:8080"
     # No volumes needed for production

@@ -3,6 +3,7 @@ package router
 import (
 	"html/template"
 	"log"
+	"os"
 
 	"github.com/CptPie/SyncRate/server/handlers"
 	"github.com/CptPie/SyncRate/server/middleware"
@@ -18,13 +19,19 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	// Configure trusted proxies (disable for direct connections)
 	r.SetTrustedProxies(nil)
 
-	// Session setup
-	store := cookie.NewStore([]byte("your-secret-key-change-this-in-production"))
+	// Session setup. The signing secret must come from the environment in
+	// production; fall back to a clearly-insecure default only for local dev.
+	secret := os.Getenv("SESSION_SECRET")
+	if secret == "" {
+		secret = "your-secret-key-change-this-in-production"
+		log.Println("WARNING: SESSION_SECRET not set; using insecure default. Set SESSION_SECRET in production.")
+	}
+	store := cookie.NewStore([]byte(secret))
 	store.Options(sessions.Options{
 		Path:     "/",
 		MaxAge:   86400 * 7, // 7 days
 		HttpOnly: true,
-		Secure:   false, // Set to true in production with HTTPS
+		Secure:   os.Getenv("COOKIE_SECURE") == "true", // enable behind HTTPS
 	})
 	r.Use(sessions.Sessions("syncrate-session", store))
 
@@ -89,48 +96,52 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	r.GET("/quiz-room/:roomId", handlers.GetQuizRoom(db))
 	r.GET("/quiz-room/:roomId/ws", handlers.GetQuizRoomWS(db))
 
-	// API routes
+	// API routes. Reads of catalog data stay public; all writes require a
+	// shared API key. User endpoints expose PII (emails) so their reads are
+	// gated behind the key as well.
 	api := r.Group("/api")
 	{
+		writeAuth := middleware.RequireAPIKey()
+
 		// Songs API
 		api.GET("/songs", handlers.GetAPISongs(db))
 		api.GET("/songs/:id", handlers.GetAPISong(db))
-		api.POST("/songs", handlers.PostAPISong(db))
+		api.POST("/songs", writeAuth, handlers.PostAPISong(db))
 
 		// Artists API
 		api.GET("/artists", handlers.GetAPIArtists(db))
 		api.GET("/artists/:id", handlers.GetAPIArtist(db))
-		api.POST("/artists", handlers.PostAPIArtist(db))
+		api.POST("/artists", writeAuth, handlers.PostAPIArtist(db))
 
 		// Albums API
 		api.GET("/albums", handlers.GetAPIAlbums(db))
 		api.GET("/albums/:id", handlers.GetAPIAlbum(db))
-		api.POST("/albums", handlers.PostAPIAlbum(db))
+		api.POST("/albums", writeAuth, handlers.PostAPIAlbum(db))
 
 		// Units API
 		api.GET("/units", handlers.GetAPIUnits(db))
 		api.GET("/units/:id", handlers.GetAPIUnit(db))
-		api.POST("/units", handlers.PostAPIUnit(db))
+		api.POST("/units", writeAuth, handlers.PostAPIUnit(db))
 
 		// Categories API
 		api.GET("/categories", handlers.GetAPICategories(db))
 		api.GET("/categories/:id", handlers.GetAPICategory(db))
-		api.POST("/categories", handlers.PostAPICategory(db))
+		api.POST("/categories", writeAuth, handlers.PostAPICategory(db))
 
 		// Votes API
 		api.GET("/votes", handlers.GetAPIVotes(db))
 		api.GET("/votes/:id", handlers.GetAPIVote(db))
-		api.POST("/votes", handlers.PostAPIVote(db))
+		api.POST("/votes", writeAuth, handlers.PostAPIVote(db))
 
-		// Users API
-		api.GET("/users", handlers.GetAPIUsers(db))
-		api.GET("/users/:id", handlers.GetAPIUser(db))
-		api.POST("/users", handlers.PostAPIUser(db))
+		// Users API (PII: require key for reads and writes)
+		api.GET("/users", writeAuth, handlers.GetAPIUsers(db))
+		api.GET("/users/:id", writeAuth, handlers.GetAPIUser(db))
+		api.POST("/users", writeAuth, handlers.PostAPIUser(db))
 	}
 
 	// Admin routes (protected)
 	admin := r.Group("/admin")
-	admin.Use(middleware.RequireAuth())
+	admin.Use(middleware.RequireAdmin(db))
 	{
 		admin.GET("/", handlers.GetAdmin(db))
 

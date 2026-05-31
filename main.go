@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/CptPie/SyncRate/database"
+	"github.com/CptPie/SyncRate/models"
 	"github.com/CptPie/SyncRate/server/handlers"
 	"github.com/CptPie/SyncRate/server/router"
 )
@@ -29,6 +30,22 @@ func main() {
 	err = db.Migrate()
 	if err != nil {
 		log.Fatal(err.Error())
+	}
+
+	// Bootstrap the admin account: promote the configured username if it
+	// exists. No-op when ADMIN_USERNAME is unset or the user hasn't
+	// registered yet (they gain admin on the next startup after registering).
+	if adminUsername := os.Getenv("ADMIN_USERNAME"); adminUsername != "" {
+		result := db.DB.Model(&models.User{}).
+			Where("username = ?", adminUsername).
+			Update("is_admin", true)
+		if result.Error != nil {
+			log.Printf("WARNING: failed to promote admin user %q: %v", adminUsername, result.Error)
+		} else if result.RowsAffected > 0 {
+			log.Printf("Ensured admin privileges for user %q", adminUsername)
+		} else {
+			log.Printf("ADMIN_USERNAME %q not found yet; register it then restart to grant admin", adminUsername)
+		}
 	}
 
 	// Start background cleanup for old rating rooms

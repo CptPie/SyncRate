@@ -15,7 +15,9 @@
             <a href="/">Home</a>
             <a href="/songs">Songs</a>
             {{if .is_authenticated}}
-                <a href="/admin">Admin</a>
+                {{if .is_admin}}
+                    <a href="/admin">Admin</a>
+                {{end}}
                 <span class="user-info">Welcome, {{.username}}!</span>
                 <form action="/logout" method="POST" style="display: inline;">
                     <button type="submit" class="logout-btn">Logout</button>

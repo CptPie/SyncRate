@@ -16,11 +16,13 @@ func GetUserContext(c *gin.Context) gin.H {
 	isAuth, _ := c.Get("is_authenticated")
 	username, _ := c.Get("username")
 	userID, _ := c.Get("user_id")
+	isAdmin, _ := c.Get("is_admin")
 
 	return gin.H{
 		"is_authenticated": isAuth,
 		"username":         username,
 		"user_id":          userID,
+		"is_admin":         isAdmin,
 	}
 }
 
@@ -79,6 +81,7 @@ func PostLogin(db *gorm.DB) gin.HandlerFunc {
 		// Set session
 		session.Set("user_id", user.UserID)
 		session.Set("username", user.Username)
+		session.Set("is_admin", user.IsAdmin)
 		if err := session.Save(); err != nil {
 			data := GetUserContext(c)
 			data["title"] = "SyncRate | Login"
@@ -181,6 +184,7 @@ func PostRegister(db *gorm.DB) gin.HandlerFunc {
 		session := sessions.Default(c)
 		session.Set("user_id", user.UserID)
 		session.Set("username", user.Username)
+		session.Set("is_admin", user.IsAdmin)
 		if err := session.Save(); err != nil {
 			// Registration succeeded but login failed - redirect to login page
 			c.Redirect(http.StatusFound, "/login")

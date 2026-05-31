@@ -5,7 +5,7 @@ services:
     restart: always
     environment:
       POSTGRES_USER: SyncRate
-      POSTGRES_PASSWORD: superSecret123
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD}
       POSTGRES_DB: SyncRate
     ports:
       - "5432:5432"
@@ -33,8 +33,16 @@ services:
       DB_HOST: db
       DB_PORT: 5432
       DB_USER: SyncRate
-      DB_PASSWORD: superSecret123
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD}
       DB_NAME: SyncRate
+      # Cookie signing key for sessions (dev value; override in prod)
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}
+      # Shared secret required for /api writes and user-data reads
+      API_KEY: ${API_KEY:?set API_KEY}
+      # Username promoted to admin on startup (register it first)
+      ADMIN_USERNAME: ${ADMIN_USERNAME:?set ADMIN_USERNAME}
+      # Only send session cookie over HTTPS (false for local http dev)
+      COOKIE_SECURE: "true"
     ports:
       - "8080:8080"
     volumes:
