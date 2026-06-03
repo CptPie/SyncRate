@@ -28,6 +28,9 @@ type Room struct {
 	VideoTime     float64            // Current video position in seconds
 	IsPlaying     bool               // Video play state
 	LastActivity  time.Time          // For cleanup
+	Schedule      []uint             // Prefetched upcoming song IDs (radio rooms)
+	Refilling     bool               // Whether a schedule refill is in progress
+	LastAdvance   time.Time          // Last time the room advanced songs (advance debounce)
 	Mutex         sync.RWMutex       // Thread safety
 }
 
@@ -277,6 +280,133 @@ func (rm *RoomManager) CleanupInactiveRooms(timeout time.Duration) {
 			log.Printf("Cleaned up inactive room %s", roomID)
 		}
 	}
+}
+
+// Radio schedule management
+//
+// Radio rooms keep an in-memory queue of upcoming song IDs (the "schedule") so
+// that advancing to the next song is a cheap pop instead of a fresh database
+// query, and so the next batch can be prefetched before the current one runs out.
+
+// PopScheduledSong removes and returns the next scheduled song ID for a room.
+func (rm *RoomManager) PopScheduledSong(roomID string) (uint, bool) {
+	rm.mutex.RLock()
+	room, exists := rm.rooms[roomID]
+	rm.mutex.RUnlock()
+	if !exists {
+		return 0, false
+	}
+
+	room.Mutex.Lock()
+	defer room.Mutex.Unlock()
+	if len(room.Schedule) == 0 {
+		return 0, false
+	}
+	songID := room.Schedule[0]
+	room.Schedule = room.Schedule[1:]
+	return songID, true
+}
+
+// AppendScheduledSongs adds song IDs to the end of a room's schedule.
+func (rm *RoomManager) AppendScheduledSongs(roomID string, songIDs []uint) {
+	if len(songIDs) == 0 {
+		return
+	}
+	rm.mutex.RLock()
+	room, exists := rm.rooms[roomID]
+	rm.mutex.RUnlock()
+	if !exists {
+		return
+	}
+
+	room.Mutex.Lock()
+	room.Schedule = append(room.Schedule, songIDs...)
+	room.Mutex.Unlock()
+}
+
+// ScheduledSongs returns a copy of the room's current schedule (upcoming song IDs).
+func (rm *RoomManager) ScheduledSongs(roomID string) []uint {
+	rm.mutex.RLock()
+	room, exists := rm.rooms[roomID]
+	rm.mutex.RUnlock()
+	if !exists {
+		return nil
+	}
+
+	room.Mutex.RLock()
+	defer room.Mutex.RUnlock()
+	out := make([]uint, len(room.Schedule))
+	copy(out, room.Schedule)
+	return out
+}
+
+// ScheduledSongCount returns how many songs are currently queued for a room.
+func (rm *RoomManager) ScheduledSongCount(roomID string) int {
+	rm.mutex.RLock()
+	room, exists := rm.rooms[roomID]
+	rm.mutex.RUnlock()
+	if !exists {
+		return 0
+	}
+
+	room.Mutex.RLock()
+	defer room.Mutex.RUnlock()
+	return len(room.Schedule)
+}
+
+// BeginRefill marks a room as refilling its schedule. It returns false if a
+// refill is already in progress, so only one prefetch runs at a time.
+func (rm *RoomManager) BeginRefill(roomID string) bool {
+	rm.mutex.RLock()
+	room, exists := rm.rooms[roomID]
+	rm.mutex.RUnlock()
+	if !exists {
+		return false
+	}
+
+	room.Mutex.Lock()
+	defer room.Mutex.Unlock()
+	if room.Refilling {
+		return false
+	}
+	room.Refilling = true
+	return true
+}
+
+// EndRefill clears the refilling flag for a room.
+func (rm *RoomManager) EndRefill(roomID string) {
+	rm.mutex.RLock()
+	room, exists := rm.rooms[roomID]
+	rm.mutex.RUnlock()
+	if !exists {
+		return
+	}
+
+	room.Mutex.Lock()
+	room.Refilling = false
+	room.Mutex.Unlock()
+}
+
+// TryAdvance reports whether the room may advance to the next song now,
+// recording the advance time when it returns true. It debounces bursts of
+// next_song requests (e.g. many clients' videos ending at nearly the same time)
+// so the room does not skip several songs at once.
+func (rm *RoomManager) TryAdvance(roomID string, minInterval time.Duration) bool {
+	rm.mutex.RLock()
+	room, exists := rm.rooms[roomID]
+	rm.mutex.RUnlock()
+	if !exists {
+		return false
+	}
+
+	room.Mutex.Lock()
+	defer room.Mutex.Unlock()
+	now := time.Now()
+	if !room.LastAdvance.IsZero() && now.Sub(room.LastAdvance) < minInterval {
+		return false
+	}
+	room.LastAdvance = now
+	return true
 }
 
 // Helper functions

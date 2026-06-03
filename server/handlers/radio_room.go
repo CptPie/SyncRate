@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/CptPie/SyncRate/models"
@@ -330,61 +331,190 @@ func handleRadioVoteUpdate(db *gorm.DB, roomID, userID string, data json.RawMess
 	radioRoomManager.BroadcastToRoom(roomID, message)
 }
 
+// Radio schedule sizing.
+const (
+	// radioScheduleBatchSize is how many songs are fetched per schedule batch.
+	radioScheduleBatchSize = 10
+	// radioSchedulePrefetchAt triggers a background refill once the queue drops
+	// to this many remaining songs.
+	radioSchedulePrefetchAt = 3
+	// radioAdvanceDebounce ignores duplicate next_song requests that arrive
+	// within this window of the previous advance.
+	radioAdvanceDebounce = 1500 * time.Millisecond
+	// radioCandidateMultiplier controls how many random candidates are fetched
+	// per batch, so enough remain after dropping excluded IDs and duplicate titles.
+	radioCandidateMultiplier = 5
+)
+
 // handleRadioNextSong handles requests to move to the next song
 func handleRadioNextSong(db *gorm.DB, roomID string) {
-	nextSong := findNextRadioSong(db, roomID)
-	if nextSong != nil {
-		updateRadioRoomCurrentSong(db, roomID, nextSong.SongID)
-		broadcastRadioSongChange(db, roomID, *nextSong)
-	} else {
-		log.Printf("No songs available for radio room %s", roomID)
+	// Debounce bursts of next_song requests (e.g. several clients' videos
+	// ending at once) so the room advances by a single song.
+	if !radioRoomManager.TryAdvance(roomID, radioAdvanceDebounce) {
+		return
 	}
+
+	songID, ok := nextScheduledSong(db, roomID)
+	if !ok {
+		log.Printf("No songs available for radio room %s", roomID)
+		return
+	}
+
+	updateRadioRoomCurrentSong(db, roomID, songID)
+	// sendRadioSongDataToRoom reloads the song (with relations) by ID, so a
+	// stub carrying just the ID is enough here.
+	broadcastRadioSongChange(db, roomID, models.Song{SongID: songID})
+
+	// Prefetch the next batch before the current one runs out.
+	maybePrefetchSchedule(db, roomID)
 }
 
-// findNextRadioSong finds the next song based on room filters
-func findNextRadioSong(db *gorm.DB, roomID string) *models.Song {
-	// Load room filters from database
+// nextScheduledSong returns the next song ID for the room, building the initial
+// schedule batch on demand when the queue is empty.
+func nextScheduledSong(db *gorm.DB, roomID string) (uint, bool) {
+	if songID, ok := radioRoomManager.PopScheduledSong(roomID); ok {
+		return songID, true
+	}
+
+	// Queue is empty: build the first batch synchronously so playback can start.
+	schedule := buildRadioSchedule(db, roomID, radioScheduleBatchSize)
+	if len(schedule) == 0 {
+		return 0, false
+	}
+	radioRoomManager.AppendScheduledSongs(roomID, schedule)
+	return radioRoomManager.PopScheduledSong(roomID)
+}
+
+// maybePrefetchSchedule refills the schedule in the background once it gets low.
+func maybePrefetchSchedule(db *gorm.DB, roomID string) {
+	if radioRoomManager.ScheduledSongCount(roomID) > radioSchedulePrefetchAt {
+		return
+	}
+	// BeginRefill ensures only one prefetch runs at a time.
+	if !radioRoomManager.BeginRefill(roomID) {
+		return
+	}
+
+	go func() {
+		defer radioRoomManager.EndRefill(roomID)
+		radioRoomManager.AppendScheduledSongs(roomID, buildRadioSchedule(db, roomID, radioScheduleBatchSize))
+	}()
+}
+
+// buildRadioSchedule selects up to count random eligible song IDs for the room,
+// applying its category, cover, and rating filters. It avoids replaying the
+// current and upcoming songs, and keeps the schedule free of duplicate songs by
+// title (so two recordings sharing a title are not both queued).
+func buildRadioSchedule(db *gorm.DB, roomID string, count int) []uint {
 	var dbRoom models.RadioRoom
 	if err := db.Where("room_id = ?", roomID).First(&dbRoom).Error; err != nil {
 		log.Printf("Error loading radio room filters: %v", err)
 		return nil
 	}
 
-	// Build base query with filters
-	baseQuery := db.Preload("Artists").Preload("Units").Preload("Albums").Preload("Category")
+	// Songs already queued so we can exclude them by ID and keep titles unique.
+	scheduled := radioRoomManager.ScheduledSongs(roomID)
+	excludeIDs := radioRepeatExclusions(dbRoom.CurrentSongID, scheduled)
+	seenTitles := radioScheduledTitles(db, scheduled)
 
-	// Apply category filter if set
-	if dbRoom.CategoryID != nil {
-		baseQuery = baseQuery.Where("category_id = ?", *dbRoom.CategoryID)
+	// Overfetch random candidates so enough survive ID exclusion and title dedup.
+	type candidate struct {
+		SongID       uint
+		NameOriginal string
 	}
-
-	// Apply covers filter
-	if !dbRoom.IncludeCovers {
-		baseQuery = baseQuery.Where("is_cover = ?", false)
-	}
-
-	// Apply rating filter if set
-	if dbRoom.MinRating != nil {
-		// Need to join with votes and calculate average rating
-		baseQuery = baseQuery.Where("song_id IN (?)",
-			db.Table("votes").
-				Select("song_id").
-				Group("song_id").
-				Having("AVG(rating) >= ?", *dbRoom.MinRating),
-		)
-	}
-
-	var song models.Song
-	err := baseQuery.
+	var candidates []candidate
+	query := radioFilteredSongQuery(db, dbRoom).
+		Select("song_id", "name_original").
 		Order("RANDOM()").
-		First(&song).Error
-
-	if err != nil {
-		log.Printf("Error finding next radio song: %v", err)
+		Limit(count * radioCandidateMultiplier)
+	if len(excludeIDs) > 0 {
+		query = query.Where("song_id NOT IN ?", excludeIDs)
+	}
+	if err := query.Scan(&candidates).Error; err != nil {
+		log.Printf("Error building radio schedule: %v", err)
 		return nil
 	}
 
-	return &song
+	schedule := make([]uint, 0, count)
+	for _, c := range candidates {
+		if len(schedule) >= count {
+			break
+		}
+		title := normalizeTitle(c.NameOriginal)
+		if _, dup := seenTitles[title]; dup {
+			continue
+		}
+		seenTitles[title] = struct{}{}
+		schedule = append(schedule, c.SongID)
+	}
+	return schedule
+}
+
+// radioRepeatExclusions returns the song IDs a new batch should avoid to
+// minimize near-term repeats: the currently playing song plus the next
+// radioSchedulePrefetchAt upcoming songs.
+func radioRepeatExclusions(currentSongID *uint, scheduled []uint) []uint {
+	exclusions := make([]uint, 0, radioSchedulePrefetchAt+1)
+	if currentSongID != nil {
+		exclusions = append(exclusions, *currentSongID)
+	}
+	for i := 0; i < len(scheduled) && i < radioSchedulePrefetchAt; i++ {
+		exclusions = append(exclusions, scheduled[i])
+	}
+	return exclusions
+}
+
+// radioScheduledTitles returns the set of normalized titles already queued, so a
+// new batch can keep the schedule free of duplicate songs by title.
+func radioScheduledTitles(db *gorm.DB, scheduled []uint) map[string]struct{} {
+	titles := make(map[string]struct{}, len(scheduled))
+	if len(scheduled) == 0 {
+		return titles
+	}
+
+	var names []string
+	if err := db.Model(&models.Song{}).
+		Where("song_id IN ?", scheduled).
+		Pluck("name_original", &names).Error; err != nil {
+		log.Printf("Error loading scheduled song titles: %v", err)
+		return titles
+	}
+	for _, name := range names {
+		titles[normalizeTitle(name)] = struct{}{}
+	}
+	return titles
+}
+
+// normalizeTitle canonicalizes a song title for duplicate comparison.
+func normalizeTitle(title string) string {
+	return strings.ToLower(strings.TrimSpace(title))
+}
+
+// radioFilteredSongQuery builds a Song query applying the room's filters.
+//
+// The rating filter is scoped to the room creator's own votes: only songs the
+// creator personally rated at or above the threshold are eligible. Songs the
+// creator never rated are excluded.
+func radioFilteredSongQuery(db *gorm.DB, dbRoom models.RadioRoom) *gorm.DB {
+	query := db.Model(&models.Song{})
+
+	if dbRoom.CategoryID != nil {
+		query = query.Where("category_id = ?", *dbRoom.CategoryID)
+	}
+
+	if !dbRoom.IncludeCovers {
+		query = query.Where("is_cover = ?", false)
+	}
+
+	if dbRoom.MinRating != nil {
+		query = query.Where("song_id IN (?)",
+			db.Table("votes").
+				Select("song_id").
+				Where("user_id = ? AND rating >= ?", dbRoom.CreatorID, *dbRoom.MinRating),
+		)
+	}
+
+	return query
 }
 
 // updateRadioRoomCurrentSong updates the current song in the database
