@@ -139,6 +139,9 @@
                         onReady: () => {
                             this.ready = true;
                             this._applyVolume();
+                            // YouTube exposes no volume-change event, so poll
+                            // its native control to persist user adjustments.
+                            if (this.controls) this._startYouTubeVolumePolling();
                             if (this.onReady) this.onReady();
                             if (this._pendingCue) {
                                 const c = this._pendingCue;
@@ -214,6 +217,22 @@
             });
             audio.addEventListener('error', () => {
                 if (this.onError) this.onError(audio.error ? audio.error.code : 0);
+            });
+            // Persist user-driven volume changes from the native controls.
+            // Programmatic writes in _applyVolume tag _appliedAudioVolume so we
+            // can tell them apart and ignore them here. Native controls top out
+            // at 100%, so a user change collapses any boost graph and treats
+            // audio.volume as the source of truth.
+            audio.addEventListener('volumechange', () => {
+                if (this.destroyed) return;
+                if (this._appliedAudioVolume != null &&
+                    Math.abs(audio.volume - this._appliedAudioVolume) < 1e-3) return;
+                const pct = Math.round(audio.volume * 100);
+                this._volumePct = pct;
+                if (this._gainNode) {
+                    try { this._gainNode.gain.value = 1; } catch (e) {}
+                }
+                savePersistedVolume(pct);
             });
 
             wrap.appendChild(audio);
@@ -327,21 +346,52 @@
             }
             if (!this._audio) return;
             const ratio = pct / 100;
+            // Record the value we're about to write so the native
+            // 'volumechange' listener can distinguish our own writes from the
+            // user dragging the control.
             if (ratio > 1) {
                 this._ensureGainGraph();
                 if (this._gainNode) {
                     this._gainNode.gain.value = ratio;
+                    this._appliedAudioVolume = 1;
                     this._audio.volume = 1;
                 } else {
                     // No Web Audio support: silently clamp at 100%.
+                    this._appliedAudioVolume = 1;
                     this._audio.volume = 1;
                 }
             } else if (this._gainNode) {
                 // Graph already wired up from an earlier boost; keep using it.
                 this._gainNode.gain.value = ratio;
+                this._appliedAudioVolume = 1;
                 this._audio.volume = 1;
             } else {
+                this._appliedAudioVolume = ratio;
                 this._audio.volume = ratio;
+            }
+        }
+
+        _startYouTubeVolumePolling() {
+            this._stopYouTubeVolumePolling();
+            this._ytVolPoll = setInterval(() => {
+                if (this.destroyed || !this._yt || !this.ready) return;
+                let v;
+                try { v = this._yt.getVolume(); } catch (e) { return; }
+                if (typeof v !== 'number') return;
+                // YT applies min(100, pct); compare against that so re-applying
+                // a boosted 150% from another room doesn't read back as a change.
+                const applied = Math.min(100, this._volumePct == null ? 100 : this._volumePct);
+                if (Math.abs(v - applied) >= 1) {
+                    this._volumePct = v;
+                    savePersistedVolume(v);
+                }
+            }, 1000);
+        }
+
+        _stopYouTubeVolumePolling() {
+            if (this._ytVolPoll) {
+                clearInterval(this._ytVolPoll);
+                this._ytVolPoll = null;
             }
         }
 
@@ -415,6 +465,7 @@
         }
 
         _teardown() {
+            this._stopYouTubeVolumePolling();
             if (this._yt) {
                 try { this._yt.destroy(); } catch (e) {}
                 this._yt = null;
