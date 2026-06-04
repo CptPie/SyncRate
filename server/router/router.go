@@ -51,8 +51,16 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 
 	r.SetHTMLTemplate(tmpl)
 
-	// Serve static files
-	r.Static("/static", "web/static")
+	// Serve static files. Force revalidation so browsers don't keep serving a
+	// stale cached copy after a deploy: gin's default static handler only sends
+	// Last-Modified (no Cache-Control), which makes browsers heuristically cache
+	// assets and skip revalidation. "no-cache" keeps the cache but requires an
+	// If-Modified-Since check each load (cheap 304s when unchanged).
+	staticGroup := r.Group("/static")
+	staticGroup.Use(func(c *gin.Context) {
+		c.Header("Cache-Control", "no-cache")
+	})
+	staticGroup.Static("/", "web/static")
 
 	// Home routes
 	r.GET("/", func(c *gin.Context) {
