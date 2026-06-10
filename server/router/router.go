@@ -181,6 +181,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		admin.POST("/users/:id/promote", handlers.PostPromoteUser(db))
 		admin.POST("/users/:id/demote", handlers.PostDemoteUser(db))
 		admin.POST("/users/:id/reset-password", handlers.PostAdminResetPassword(db))
+		admin.POST("/users/:id/delete", handlers.PostDeleteUser(db))
 
 		// Edit routes
 		admin.POST("/categories/:id/edit", handlers.PostEditCategory(db))

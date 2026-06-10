@@ -57,6 +57,14 @@
                 <form action="/admin/users/{{.UserID}}/reset-password" method="POST" style="display: inline;">
                   <button type="submit" class="btn-secondary">Reset Password</button>
                 </form>
+                {{if eq .UserID $.currentUserID}}
+                  <button class="btn-danger" disabled title="You cannot delete your own account">Delete</button>
+                {{else}}
+                  <form action="/admin/users/{{.UserID}}/delete" method="POST" style="display: inline;"
+                        onsubmit="return confirm('Delete {{.Username}} and all of their votes? This cannot be undone.');">
+                    <button type="submit" class="btn-danger">Delete</button>
+                  </form>
+                {{end}}
               </div>
             </div>
             <div class="view-card-details">

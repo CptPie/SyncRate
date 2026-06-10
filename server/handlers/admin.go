@@ -1532,3 +1532,66 @@ func PostDemoteUser(db *gorm.DB) gin.HandlerFunc {
 		setUserAdmin(db, c, false)
 	}
 }
+
+// Delete a user along with all of their votes.
+func PostDeleteUser(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		idParam := c.Param("id")
+		log.Printf("PostDeleteUser: Deleting user ID: %s", idParam)
+
+		id, err := strconv.ParseUint(idParam, 10, 32)
+		if err != nil {
+			log.Printf("PostDeleteUser: Invalid user ID format: %v", err)
+			c.HTML(http.StatusBadRequest, "error.html", gin.H{
+				"error": "Invalid user ID: " + err.Error(),
+			})
+			return
+		}
+
+		// Guard against an admin deleting their own account and locking
+		// themselves out.
+		if currentUserID, ok := c.Get("user_id"); ok {
+			if cur, ok := currentUserID.(uint); ok && cur == uint(id) {
+				c.HTML(http.StatusBadRequest, "error.html", gin.H{
+					"error": "You cannot delete your own account",
+				})
+				return
+			}
+		}
+
+		// Start transaction to delete the user and their votes together.
+		tx := db.Begin()
+
+		// Delete the user's votes
+		if err := tx.Where("user_id = ?", id).Delete(&models.Vote{}).Error; err != nil {
+			tx.Rollback()
+			log.Printf("PostDeleteUser: Error deleting user votes: %v", err)
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+				"error": "Failed to delete user votes: " + err.Error(),
+			})
+			return
+		}
+
+		// Delete the user
+		result := tx.Delete(&models.User{}, uint(id))
+		if result.Error != nil {
+			tx.Rollback()
+			log.Printf("PostDeleteUser: Error deleting user: %v", result.Error)
+			c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+				"error": "Failed to delete user: " + result.Error.Error(),
+			})
+			return
+		}
+		if result.RowsAffected == 0 {
+			tx.Rollback()
+			c.HTML(http.StatusNotFound, "error.html", gin.H{
+				"error": "User not found",
+			})
+			return
+		}
+
+		tx.Commit()
+		log.Printf("PostDeleteUser: Successfully deleted user with ID %d", id)
+		c.Redirect(http.StatusSeeOther, "/admin/users")
+	}
+}
