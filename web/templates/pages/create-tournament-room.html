@@ -92,6 +92,14 @@
 
             <div class="form-group">
               <label class="checkbox-label">
+                <input type="checkbox" id="originals-only-filter" />
+                <span>Originals Only</span>
+              </label>
+              <p class="checkbox-description">Only include original songs</p>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-label">
                 <input type="checkbox" id="video-sync-enabled" checked />
                 <span>Enable Video Synchronization</span>
               </label>
@@ -150,6 +158,17 @@
           votedRatioGroup.style.display = this.checked ? "none" : "block";
         });
 
+      // Covers Only and Originals Only are mutually exclusive
+      const coversOnlyFilter = document.getElementById("covers-only-filter");
+      const originalsOnlyFilter =
+        document.getElementById("originals-only-filter");
+      coversOnlyFilter.addEventListener("change", function () {
+        if (this.checked) originalsOnlyFilter.checked = false;
+      });
+      originalsOnlyFilter.addEventListener("change", function () {
+        if (this.checked) coversOnlyFilter.checked = false;
+      });
+
       document
         .getElementById("create-room-btn")
         .addEventListener("click", async function () {
@@ -167,6 +186,8 @@
           );
           const coversOnly =
             document.getElementById("covers-only-filter").checked;
+          const originalsOnly =
+            document.getElementById("originals-only-filter").checked;
           const videoSyncEnabled =
             document.getElementById("video-sync-enabled").checked;
 
@@ -174,6 +195,7 @@
           const requestBody = {
             tree_size: treeSize,
             covers_only: coversOnly,
+            originals_only: originalsOnly,
             video_sync_enabled: videoSyncEnabled,
           };
 

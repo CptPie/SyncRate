@@ -92,6 +92,7 @@ func PostCreateTournamentRoom(db *gorm.DB) gin.HandlerFunc {
 			VotedOnly        bool     `json:"voted_only"`
 			VotedRatio       *float64 `json:"voted_ratio"`
 			CoversOnly       bool     `json:"covers_only"`
+			OriginalsOnly    bool     `json:"originals_only"`
 			VideoSyncEnabled bool     `json:"video_sync_enabled"`
 		}
 
@@ -111,7 +112,7 @@ func PostCreateTournamentRoom(db *gorm.DB) gin.HandlerFunc {
 		roomID := generateTournamentRoomCode()
 
 		// Select songs for the tournament
-		songs, songWarning, err := selectTournamentSongs(db, userID.(uint), requestBody.TreeSize, requestBody.CategoryID, requestBody.VotedOnly, requestBody.VotedRatio, requestBody.CoversOnly)
+		songs, songWarning, err := selectTournamentSongs(db, userID.(uint), requestBody.TreeSize, requestBody.CategoryID, requestBody.VotedOnly, requestBody.VotedRatio, requestBody.CoversOnly, requestBody.OriginalsOnly)
 		if err != nil {
 			log.Printf("Error selecting tournament songs: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to select songs: %v", err)})
@@ -135,6 +136,7 @@ func PostCreateTournamentRoom(db *gorm.DB) gin.HandlerFunc {
 			VotedOnly:        requestBody.VotedOnly,
 			VotedRatio:       requestBody.VotedRatio,
 			CoversOnly:       requestBody.CoversOnly,
+			OriginalsOnly:    requestBody.OriginalsOnly,
 			VideoSyncEnabled: requestBody.VideoSyncEnabled,
 			TreeState:        treeState,
 			Status:           "setup",
@@ -170,7 +172,7 @@ func PostCreateTournamentRoom(db *gorm.DB) gin.HandlerFunc {
 }
 
 // selectTournamentSongs selects songs for the tournament based on filters
-func selectTournamentSongs(db *gorm.DB, userID uint, count int, categoryID *uint, votedOnly bool, votedRatio *float64, coversOnly bool) ([]models.Song, string, error) {
+func selectTournamentSongs(db *gorm.DB, userID uint, count int, categoryID *uint, votedOnly bool, votedRatio *float64, coversOnly bool, originalsOnly bool) ([]models.Song, string, error) {
 	var songs []models.Song
 
 	// Build base query
@@ -184,6 +186,11 @@ func selectTournamentSongs(db *gorm.DB, userID uint, count int, categoryID *uint
 	// Apply covers filter
 	if coversOnly {
 		baseQuery = baseQuery.Where("is_cover = ?", true)
+	}
+
+	// Apply originals filter
+	if originalsOnly {
+		baseQuery = baseQuery.Where("is_cover = ?", false)
 	}
 
 	if votedOnly {
@@ -235,6 +242,9 @@ func selectTournamentSongs(db *gorm.DB, userID uint, count int, categoryID *uint
 		if coversOnly {
 			votedQuery = votedQuery.Where("songs.is_cover = ?", true)
 		}
+		if originalsOnly {
+			votedQuery = votedQuery.Where("songs.is_cover = ?", false)
+		}
 
 		votedQuery.Order("RANDOM()").Limit(votedCount).Find(&votedSongs)
 	}
@@ -251,6 +261,9 @@ func selectTournamentSongs(db *gorm.DB, userID uint, count int, categoryID *uint
 		}
 		if coversOnly {
 			unvotedQuery = unvotedQuery.Where("songs.is_cover = ?", true)
+		}
+		if originalsOnly {
+			unvotedQuery = unvotedQuery.Where("songs.is_cover = ?", false)
 		}
 
 		unvotedQuery.Order("RANDOM()").Limit(unvotedCount).Find(&unvotedSongs)
@@ -289,6 +302,9 @@ func selectTournamentSongs(db *gorm.DB, userID uint, count int, categoryID *uint
 		}
 		if coversOnly {
 			fillQuery = fillQuery.Where("is_cover = ?", true)
+		}
+		if originalsOnly {
+			fillQuery = fillQuery.Where("is_cover = ?", false)
 		}
 
 		fillQuery.Order("RANDOM()").Limit(remaining).Find(&additionalSongs)

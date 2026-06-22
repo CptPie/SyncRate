@@ -15,6 +15,7 @@ type TournamentRoom struct {
 	VotedOnly        bool      `gorm:"default:false"`
 	VotedRatio       *float64  `gorm:"default:null"` // Ratio of voted songs (0.0-1.0), null if VotedOnly is true
 	CoversOnly       bool      `gorm:"default:false"`
+	OriginalsOnly    bool      `gorm:"default:false"`
 	VideoSyncEnabled bool      `gorm:"default:true"`
 	TreeState        TreeState `gorm:"type:jsonb"` // Store the entire tree structure as JSON
 	CurrentMatchID   *string   `gorm:"index"`      // Current active match ID
