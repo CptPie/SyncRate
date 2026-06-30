@@ -18,7 +18,7 @@
                 {{if .is_admin}}
                     <a href="/admin">Admin</a>
                 {{end}}
-                <span class="user-info">Welcome, {{.username}}!</span>
+                <a href="/my-votes" class="user-info">Welcome, {{.username}}!</a>
                 <form action="/logout" method="POST" style="display: inline;">
                     <button type="submit" class="logout-btn">Logout</button>
                 </form>

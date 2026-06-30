@@ -1,0 +1,246 @@
+{{define "my-votes.html"}}
+<!doctype html>
+<html lang="en">
+  <head>
+    {{template "head" .}}
+  </head>
+  <body>
+    <div class="container">
+      {{template "header" .}}
+      <main>
+        <h2>My Votes</h2>
+
+        {{if .votes}}
+        <div class="search-filter-container">
+          <div class="search-filter-row">
+            <div class="search-group">
+              <label for="vote-search" class="form-label">Search</label>
+              <input
+                type="text"
+                id="vote-search"
+                class="search-input"
+                placeholder="Search by song name or artist..."
+              />
+              <div class="search-stats" id="search-stats">
+                {{.voteCount}} votes total
+              </div>
+            </div>
+            <div class="filter-group">
+              <label for="category-filter" class="form-label"
+                >Filter by Category</label
+              >
+              <select id="category-filter" class="filter-select">
+                <option value="">All Categories</option>
+              </select>
+              <label for="type-filter" class="form-label" style="margin-top: 8px"
+                >Type</label
+              >
+              <select id="type-filter" class="filter-select">
+                <option value="">Covers &amp; Originals</option>
+                <option value="covers">Covers Only</option>
+                <option value="originals">Originals Only</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label for="rating-filter" class="form-label"
+                >Filter by Rating</label
+              >
+              <select id="rating-filter" class="filter-select">
+                <option value="">All Ratings</option>
+              </select>
+              <label for="sort-by" class="form-label" style="margin-top: 8px"
+                >Sort by</label
+              >
+              <div class="sort-controls">
+                <select id="sort-by" class="filter-select">
+                  <option value="vote_id">Vote ID</option>
+                  <option value="rating">Rating</option>
+                  <option value="name">Name</option>
+                </select>
+                <button
+                  type="button"
+                  id="sort-dir"
+                  class="btn-secondary sort-dir-btn"
+                  title="Toggle sort direction"
+                  data-dir="asc"
+                >
+                  ↑
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="song-grid" id="votes-container">
+          <!-- Vote cards rendered by JavaScript -->
+        </div>
+
+        <div id="no-results" class="no-results" style="display: none">
+          <h3>No votes found</h3>
+          <p>Try adjusting your search terms or filters</p>
+        </div>
+        {{else}}
+        <p>
+          You haven't voted on any songs yet.
+          <a href="/songs">Browse songs</a> to get started.
+        </p>
+        {{end}}
+      </main>
+    </div>
+
+    <script src="/static/js/theme-toggle.js"></script>
+    {{if .votes}}
+    <script>
+      (function () {
+        const votesData = JSON.parse('{{.votesJSON}}');
+        const categoriesData = JSON.parse('{{.categoriesJSON}}');
+
+        const searchInput = document.getElementById("vote-search");
+        const categoryFilter = document.getElementById("category-filter");
+        const typeFilter = document.getElementById("type-filter");
+        const ratingFilter = document.getElementById("rating-filter");
+        const sortBy = document.getElementById("sort-by");
+        const sortDirBtn = document.getElementById("sort-dir");
+        const container = document.getElementById("votes-container");
+        const noResults = document.getElementById("no-results");
+        const stats = document.getElementById("search-stats");
+
+        // Populate category options
+        categoriesData.forEach(function (cat) {
+          const opt = document.createElement("option");
+          opt.value = String(cat.CategoryID);
+          opt.textContent = cat.Name;
+          categoryFilter.appendChild(opt);
+        });
+
+        // Populate rating options (10 down to 1)
+        for (let r = 10; r >= 1; r--) {
+          const opt = document.createElement("option");
+          opt.value = String(r);
+          opt.textContent = r + " / 10";
+          ratingFilter.appendChild(opt);
+        }
+
+        function escapeHTML(str) {
+          const div = document.createElement("div");
+          div.textContent = str == null ? "" : String(str);
+          return div.innerHTML;
+        }
+
+        function renderVoteCard(vote) {
+          const tags =
+            vote.category_name || vote.is_cover
+              ? `<div class="categories">Tags:
+                  ${vote.category_name ? `<span class="category">${escapeHTML(vote.category_name)}</span>` : ""}
+                  ${vote.is_cover ? '<span class="category" style="background: #28a745">Cover</span>' : ""}
+                </div>`
+              : "";
+
+          const comment = vote.comment
+            ? `<div class="vote-comment">“${escapeHTML(vote.comment)}”</div>`
+            : "";
+
+          return `
+            <a href="/songs/${vote.song_id}" style="text-decoration: none; color: inherit">
+              <div class="song-card" data-song-id="${vote.song_id}">
+                <div class="song-card-header">
+                  ${vote.thumbnail_url ? `<img src="${escapeHTML(vote.thumbnail_url)}" alt="${escapeHTML(vote.name_original)}" class="song-card-image" />` : ""}
+                  <div class="song-average-score">
+                    <span class="score-value">${vote.rating}</span>
+                    <span class="score-separator">/</span>
+                    <span class="score-max">10</span>
+                  </div>
+                </div>
+                <h3>${escapeHTML(vote.name_original)}</h3>
+                ${vote.name_english ? `<p><em>${escapeHTML(vote.name_english)}</em></p>` : ""}
+                <div class="artist">${escapeHTML(vote.artists)}</div>
+                ${tags}
+                ${comment}
+              </div>
+            </a>
+          `;
+        }
+
+        function getFiltered() {
+          const search = searchInput.value.trim().toLowerCase();
+          const category = categoryFilter.value;
+          const type = typeFilter.value;
+          const rating = ratingFilter.value;
+
+          let result = votesData.filter(function (v) {
+            if (category && String(v.category_id) !== category) return false;
+            if (type === "covers" && !v.is_cover) return false;
+            if (type === "originals" && v.is_cover) return false;
+            if (rating && String(v.rating) !== rating) return false;
+            if (search) {
+              const haystack = (
+                (v.name_original || "") +
+                " " +
+                (v.name_english || "") +
+                " " +
+                (v.artists || "")
+              ).toLowerCase();
+              if (haystack.indexOf(search) === -1) return false;
+            }
+            return true;
+          });
+
+          const dir = sortDirBtn.dataset.dir === "desc" ? -1 : 1;
+          const key = sortBy.value;
+          result.sort(function (a, b) {
+            let cmp;
+            if (key === "rating") {
+              cmp = a.rating - b.rating;
+              if (cmp === 0) cmp = a.vote_id - b.vote_id;
+            } else if (key === "name") {
+              cmp = (a.name_original || "").localeCompare(
+                b.name_original || "",
+              );
+            } else {
+              cmp = a.vote_id - b.vote_id;
+            }
+            return cmp * dir;
+          });
+
+          return result;
+        }
+
+        function render() {
+          const filtered = getFiltered();
+
+          if (filtered.length === 0) {
+            container.innerHTML = "";
+            container.style.display = "none";
+            noResults.style.display = "block";
+          } else {
+            container.innerHTML = filtered.map(renderVoteCard).join("");
+            container.style.display = "";
+            noResults.style.display = "none";
+          }
+
+          if (filtered.length === votesData.length) {
+            stats.textContent = `${votesData.length} votes total`;
+          } else {
+            stats.textContent = `${filtered.length} of ${votesData.length} votes`;
+          }
+        }
+
+        searchInput.addEventListener("input", render);
+        categoryFilter.addEventListener("change", render);
+        typeFilter.addEventListener("change", render);
+        ratingFilter.addEventListener("change", render);
+        sortBy.addEventListener("change", render);
+        sortDirBtn.addEventListener("click", function () {
+          const next = sortDirBtn.dataset.dir === "asc" ? "desc" : "asc";
+          sortDirBtn.dataset.dir = next;
+          sortDirBtn.textContent = next === "asc" ? "↑" : "↓";
+          render();
+        });
+
+        render();
+      })();
+    </script>
+    {{end}}
+  </body>
+</html>
+{{end}}

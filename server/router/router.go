@@ -80,6 +80,9 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	r.POST("/register", handlers.PostRegister(db))
 	r.POST("/logout", handlers.PostLogout(db))
 
+	// Authenticated user's own votes page
+	r.GET("/my-votes", handlers.GetMyVotes(db))
+
 	// Password reset (token in the URL is the credential; no session needed)
 	r.GET("/reset/:token", handlers.GetResetPassword(db))
 	r.POST("/reset/:token", handlers.PostResetPassword(db))

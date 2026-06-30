@@ -736,6 +736,37 @@ input[type="color"]:focus {
   cursor: pointer;
 }
 
+/* Sort controls (My Votes page) */
+.sort-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.sort-controls .filter-select {
+  flex: 1;
+}
+
+.sort-dir-btn {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
+/* Vote comment on My Votes cards */
+.vote-comment {
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: var(--bg-secondary);
+  border-left: 3px solid var(--accent-primary);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-style: italic;
+}
+
 .no-results {
   text-align: center;
   padding: 40px 20px;
@@ -1765,6 +1796,11 @@ input[type="color"]:focus {
   font-weight: 500;
   font-size: 14px;
   margin-right: 10px;
+  text-decoration: none;
+}
+
+a.user-info:hover {
+  color: var(--accent-primary);
 }
 
 .logout-btn {
