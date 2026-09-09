@@ -137,7 +137,7 @@
 
       // Render function for album cards
       function renderAlbumCard(album) {
-        const songsCount = album.Songs ? album.Songs.length : 0;
+        const songsCount = album.SongCount || 0;
 
         return `
           <div class="view-card" data-id="${album.AlbumID}">

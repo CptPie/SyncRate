@@ -19,6 +19,10 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	// Configure trusted proxies (disable for direct connections)
 	r.SetTrustedProxies(nil)
 
+	// Compress text responses. Registered first so it wraps every route,
+	// including the static file server.
+	r.Use(middleware.Gzip())
+
 	// Session setup. The signing secret must come from the environment in
 	// production; fall back to a clearly-insecure default only for local dev.
 	secret := os.Getenv("SESSION_SECRET")

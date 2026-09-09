@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"log"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,16 +16,63 @@ import (
 	"gorm.io/gorm/logger"
 )
 
+// Compact projections of the song graph for the /songs listing.
+//
+// The full models drag along per-row timestamps plus nested back-references
+// (Artist.Category, Artist.Songs, Album.Songs, Song.Votes) that the page never
+// reads. At 4137 songs that dead weight was ~75% of a 10.7 MB response, so only
+// the fields the card renderer, the colour styling and the search index
+// actually touch are serialised.
+//
+// The JSON field names deliberately mirror the model field names: the renderers
+// in web/templates/components/search-filter.html, the search field list it
+// passes to FuzzySearchFilter, and web/static/js/artist-colors.js all index
+// into these objects by name.
+type songListEntity struct {
+	NameOriginal   string
+	NameEnglish    string
+	PrimaryColor   string
+	SecondaryColor string
+}
+
+type songListAlbum struct {
+	NameOriginal string
+	NameEnglish  string
+}
+
+type songListCategory struct {
+	CategoryID uint
+	Name       string
+}
+
+type songListItem struct {
+	SongID       uint
+	NameOriginal string
+	NameEnglish  string
+	SourceURL    string
+	ThumbnailURL string
+	IsCover      bool
+	CategoryID   *uint
+	Category     *songListCategory
+	Artists      []songListEntity
+	Units        []songListEntity
+	Albums       []songListAlbum
+	AverageScore float64 `json:"average_score"`
+	VoteCount    int64   `json:"vote_count"`
+}
+
+func newSongListEntity(nameOriginal, nameEnglish, primary, secondary string) songListEntity {
+	return songListEntity{
+		NameOriginal:   nameOriginal,
+		NameEnglish:    nameEnglish,
+		PrimaryColor:   primary,
+		SecondaryColor: secondary,
+	}
+}
+
 func GetSongs(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		log.Println("GetSongs: Starting to load all songs")
-
-		// Define a structure to hold song data with average score
-		type SongWithAverage struct {
-			models.Song
-			AverageScore float64 `json:"average_score"`
-			VoteCount    int64   `json:"vote_count"`
-		}
 
 		var songs []models.Song
 		var categories []models.Category
@@ -41,41 +89,68 @@ func GetSongs(db *gorm.DB) gin.HandlerFunc {
 
 		db.Find(&categories)
 
-		// Create database wrapper to use existing functions
+		// One grouped query for every song's score, rather than per-song lookups.
 		dbWrapper := &database.Database{DB: db}
-
-		// Calculate average scores for each song using existing database functions
-		var songsWithAverages []SongWithAverage
-		for _, song := range songs {
-			avgScore, err := dbWrapper.GetAverageRatingForSong(song.SongID)
-			if err != nil {
-				log.Printf("Error getting average rating for song %d: %v", song.SongID, err)
-				avgScore = 0 // Default to 0 if error
-			}
-
-			voteCount, err := dbWrapper.GetVoteCountForSong(song.SongID)
-			if err != nil {
-				log.Printf("Error getting vote count for song %d: %v", song.SongID, err)
-				voteCount = 0 // Default to 0 if error
-			}
-
-			songWithAvg := SongWithAverage{
-				Song:         song,
-				AverageScore: avgScore,
-				VoteCount:    voteCount,
-			}
-			songsWithAverages = append(songsWithAverages, songWithAvg)
+		stats, err := dbWrapper.GetSongRatingStats()
+		if err != nil {
+			// Scores are decoration; the catalogue is still worth serving without them.
+			log.Printf("GetSongs: Error loading song rating stats: %v", err)
+			stats = map[uint]database.SongRatingStat{}
 		}
 
-		// Convert to JSON for JavaScript (using the enhanced structure)
-		songsJSON, _ := json.Marshal(songsWithAverages)
+		songList := make([]songListItem, 0, len(songs))
+		for _, song := range songs {
+			item := songListItem{
+				SongID:       song.SongID,
+				NameOriginal: song.NameOriginal,
+				NameEnglish:  song.NameEnglish,
+				SourceURL:    song.SourceURL,
+				ThumbnailURL: song.ThumbnailURL,
+				IsCover:      song.IsCover,
+				CategoryID:   song.CategoryID,
+			}
+
+			if song.Category != nil {
+				item.Category = &songListCategory{
+					CategoryID: song.Category.CategoryID,
+					Name:       song.Category.Name,
+				}
+			}
+
+			for _, artist := range song.Artists {
+				item.Artists = append(item.Artists, newSongListEntity(
+					artist.NameOriginal, artist.NameEnglish, artist.PrimaryColor, artist.SecondaryColor))
+			}
+			for _, unit := range song.Units {
+				item.Units = append(item.Units, newSongListEntity(
+					unit.NameOriginal, unit.NameEnglish, unit.PrimaryColor, unit.SecondaryColor))
+			}
+			for _, album := range song.Albums {
+				item.Albums = append(item.Albums, songListAlbum{
+					NameOriginal: album.NameOriginal,
+					NameEnglish:  album.NameEnglish,
+				})
+			}
+
+			if stat, ok := stats[song.SongID]; ok {
+				// The card renders this with toFixed(1); full float64 precision
+				// would just be ~14 wasted bytes per song on the wire.
+				item.AverageScore = math.Round(stat.AvgRating*100) / 100
+				item.VoteCount = stat.VoteCount
+			}
+
+			songList = append(songList, item)
+		}
+
+		// Inlined into the page for the client-side search and pagination.
+		songsJSON, _ := json.Marshal(songList)
 		categoriesJSON, _ := json.Marshal(categories)
 
 		log.Printf("GetSongs: Successfully loaded %d songs", len(songs))
 
 		templateData := GetUserContext(c)
 		templateData["title"] = "SyncRate | All Songs"
-		templateData["songs"] = songsWithAverages
+		templateData["songs"] = songList
 		templateData["categories"] = categories
 		templateData["songsJSON"] = string(songsJSON)
 		templateData["categoriesJSON"] = string(categoriesJSON)

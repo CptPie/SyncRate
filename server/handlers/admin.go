@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/CptPie/SyncRate/database"
 	"github.com/CptPie/SyncRate/models"
 	"github.com/CptPie/SyncRate/server/utils"
 	"github.com/gin-gonic/gin"
@@ -358,16 +359,18 @@ func GetViewUnits(db *gorm.DB) gin.HandlerFunc {
 		var artists []models.Artist
 		db.Preload("Category").Preload("Artists").Find(&units)
 		db.Find(&categories)
-		db.Preload("Category").Find(&artists)
+		db.Find(&artists)
+
+		unitList := newAdminUnitItems(units)
 
 		// Convert to JSON for JavaScript
-		unitsJSON, _ := json.Marshal(units)
-		categoriesJSON, _ := json.Marshal(categories)
-		artistsJSON, _ := json.Marshal(artists)
+		unitsJSON, _ := json.Marshal(unitList)
+		categoriesJSON, _ := json.Marshal(newAdminCategoryRefs(categories))
+		artistsJSON, _ := json.Marshal(newAdminArtistRefs(artists))
 
 		templateData := GetUserContext(c)
 		templateData["title"] = "SyncRate | View Units"
-		templateData["units"] = units
+		templateData["units"] = unitList
 		templateData["categories"] = categories
 		templateData["artists"] = artists
 		templateData["unitsJSON"] = string(unitsJSON)
@@ -391,14 +394,16 @@ func GetViewArtists(db *gorm.DB) gin.HandlerFunc {
 		db.Find(&categories)
 		db.Find(&units)
 
+		artistList := newAdminArtistItems(artists)
+
 		// Convert to JSON for JavaScript
-		artistsJSON, _ := json.Marshal(artists)
-		categoriesJSON, _ := json.Marshal(categories)
-		unitsJSON, _ := json.Marshal(units)
+		artistsJSON, _ := json.Marshal(artistList)
+		categoriesJSON, _ := json.Marshal(newAdminCategoryRefs(categories))
+		unitsJSON, _ := json.Marshal(newAdminUnitRefs(units))
 
 		templateData := GetUserContext(c)
 		templateData["title"] = "SyncRate | View Artists"
-		templateData["artists"] = artists
+		templateData["artists"] = artistList
 		templateData["categories"] = categories
 		templateData["units"] = units
 		templateData["artistsJSON"] = string(artistsJSON)
@@ -962,22 +967,26 @@ func GetViewSongs(db *gorm.DB) gin.HandlerFunc {
 		var units []models.Unit
 		var albums []models.Album
 
+		// The related entities are only ever used as id/name option lists for the
+		// edit modal's pickers, so their categories do not need hydrating.
 		db.Preload("Category").Preload("Artists").Preload("Units").Preload("Albums").Order("song_id").Find(&songs)
 		db.Find(&categories)
-		db.Preload("Category").Find(&artists)
-		db.Preload("Category").Find(&units)
-		db.Preload("Category").Find(&albums)
+		db.Find(&artists)
+		db.Find(&units)
+		db.Find(&albums)
+
+		songList := newAdminSongItems(songs)
 
 		// Convert to JSON for JavaScript
-		songsJSON, _ := json.Marshal(songs)
-		categoriesJSON, _ := json.Marshal(categories)
-		artistsJSON, _ := json.Marshal(artists)
-		unitsJSON, _ := json.Marshal(units)
-		albumsJSON, _ := json.Marshal(albums)
+		songsJSON, _ := json.Marshal(songList)
+		categoriesJSON, _ := json.Marshal(newAdminCategoryRefs(categories))
+		artistsJSON, _ := json.Marshal(newAdminArtistRefs(artists))
+		unitsJSON, _ := json.Marshal(newAdminUnitRefs(units))
+		albumsJSON, _ := json.Marshal(newAdminAlbumRefs(albums))
 
 		templateData := GetUserContext(c)
 		templateData["title"] = "SyncRate | View Songs"
-		templateData["songs"] = songs
+		templateData["songs"] = songList
 		templateData["categories"] = categories
 		templateData["artists"] = artists
 		templateData["units"] = units
@@ -1302,16 +1311,28 @@ func GetViewAlbums(db *gorm.DB) gin.HandlerFunc {
 
 		var albums []models.Album
 		var categories []models.Category
-		db.Preload("Category").Preload("Songs").Order("album_id").Find(&albums)
+		// The card shows only the size of the tracklist, so count the songs
+		// rather than hydrating every one of them onto every album.
+		db.Preload("Category").Order("album_id").Find(&albums)
 		db.Find(&categories)
 
+		dbWrapper := &database.Database{DB: db}
+		songCounts, err := dbWrapper.GetAlbumSongCounts()
+		if err != nil {
+			// A missing count only blanks one line on the card.
+			log.Printf("GetViewAlbums: Error counting album songs: %v", err)
+			songCounts = map[uint]int64{}
+		}
+
+		albumList := newAdminAlbumItems(albums, songCounts)
+
 		// Convert to JSON for JavaScript
-		albumsJSON, _ := json.Marshal(albums)
-		categoriesJSON, _ := json.Marshal(categories)
+		albumsJSON, _ := json.Marshal(albumList)
+		categoriesJSON, _ := json.Marshal(newAdminCategoryRefs(categories))
 
 		templateData := GetUserContext(c)
 		templateData["title"] = "SyncRate | View Albums"
-		templateData["albums"] = albums
+		templateData["albums"] = albumList
 		templateData["categories"] = categories
 		templateData["albumsJSON"] = string(albumsJSON)
 		templateData["categoriesJSON"] = string(categoriesJSON)

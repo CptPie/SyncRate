@@ -280,3 +280,34 @@ func (db *Database) UpsertVote(vote *models.Vote) error {
 		return db.CreateVote(vote)
 	}
 }
+
+// SongRatingStat holds the aggregate vote figures for a single song.
+type SongRatingStat struct {
+	SongID    uint
+	AvgRating float64
+	VoteCount int64
+}
+
+// GetSongRatingStats returns the average rating and vote count for every song
+// that has at least one vote, keyed by song ID. Songs without votes are absent
+// from the map, so callers should treat a miss as zero/zero.
+//
+// Anything rendering a list of songs must use this rather than calling
+// GetAverageRatingForSong and GetVoteCountForSong per song: those each verify
+// the song exists first, so the per-song path costs four queries and the /songs
+// page was issuing ~16.5k of them (4137 songs) on every request.
+func (db *Database) GetSongRatingStats() (map[uint]SongRatingStat, error) {
+	var rows []SongRatingStat
+	if err := db.DB.Model(&models.Vote{}).
+		Select("song_id, CAST(AVG(rating) AS DOUBLE PRECISION) AS avg_rating, COUNT(*) AS vote_count").
+		Group("song_id").
+		Scan(&rows).Error; err != nil {
+		return nil, fmt.Errorf("failed to aggregate song rating stats: %w", err)
+	}
+
+	stats := make(map[uint]SongRatingStat, len(rows))
+	for _, row := range rows {
+		stats[row.SongID] = row
+	}
+	return stats, nil
+}

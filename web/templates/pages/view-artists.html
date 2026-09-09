@@ -226,9 +226,9 @@
       const unitsData = JSON.parse("{{.unitsJSON}}");
 
       function openEditModal(artistId) {
-        // Find artist data
-        const artists = JSON.parse("{{.artistsJSON}}");
-        currentArtist = artists.find(a => a.ArtistID === artistId);
+        // Find artist data. Reuses the array parsed below rather than
+        // re-embedding and re-parsing the whole list on every Edit click.
+        currentArtist = artistsData.find(a => a.ArtistID === artistId);
 
         if (currentArtist) {
           // Populate form fields

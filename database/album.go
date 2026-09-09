@@ -247,3 +247,30 @@ func (db *Database) GetAlbumsWithArt() ([]models.Album, error) {
 	}
 	return albums, nil
 }
+
+// GetAlbumSongCounts returns the number of songs on each album, keyed by album
+// ID. Albums with no songs are absent from the map.
+//
+// The admin album list only renders the size of an album's tracklist, so this
+// exists to avoid Preload("Songs"), which hydrates every song row on every
+// album just to call len() on the result.
+func (db *Database) GetAlbumSongCounts() (map[uint]int64, error) {
+	type albumSongCount struct {
+		AlbumID   uint
+		SongCount int64
+	}
+
+	var rows []albumSongCount
+	if err := db.DB.Model(&models.AlbumSong{}).
+		Select("album_id, COUNT(*) AS song_count").
+		Group("album_id").
+		Scan(&rows).Error; err != nil {
+		return nil, fmt.Errorf("failed to count album songs: %w", err)
+	}
+
+	counts := make(map[uint]int64, len(rows))
+	for _, row := range rows {
+		counts[row.AlbumID] = row.SongCount
+	}
+	return counts, nil
+}
