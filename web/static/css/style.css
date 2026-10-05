@@ -457,6 +457,9 @@ input[type="color"]:focus {
   font-size: 16px;
   font-weight: 500;
   width: 100%;
+  /* Without this the 12px padding is added outside the 100% width, so the
+     button overhangs its container's right padding by 24px. */
+  box-sizing: border-box;
   /*   transition: background-color 0.3s ease; */
 }
 
