@@ -8,24 +8,25 @@ import (
 
 // QuizRoom represents a quiz game room
 type QuizRoom struct {
-	RoomID           string    `gorm:"primaryKey;size:8"`
-	CreatorID        uint      `gorm:"not null"`
-	MaxRounds        *int      `gorm:"default:null"`        // nil = endless
-	QuestionType     string    `gorm:"not null"`             // title, artist, both
-	QuizStyle        string    `gorm:"not null"`             // fixed, progressive
-	FixedTimeLimit   int       `gorm:"default:30"`           // seconds for fixed mode (1, 5, 10, 30, 60)
-	CategoryID       *uint     `gorm:"index"`
-	VotedOnly        bool      `gorm:"default:false"`
-	VotedRatio       *float64  `gorm:"default:null"`
-	CoversOnly       bool      `gorm:"default:false"`
-	OriginalsOnly    bool      `gorm:"default:false"`
-	FuzzyInput       bool      `gorm:"default:true"`         // use fuzzy search dropdowns vs free text
-	OneOfArtists     bool      `gorm:"default:false"`        // correct if at least one artist matches
-	FilterByGuessedArtist bool `gorm:"default:false"`        // when question_type=both, narrow title dropdown to songs by the guessed artist
-	QuizState        QuizState `gorm:"type:jsonb"`
-	Status           string    `gorm:"default:'setup'"`      // setup, in_progress
-	CreatedAt        time.Time
-	LastActive       time.Time `gorm:"index"`
+	RoomID                string      `gorm:"primaryKey;size:8"`
+	CreatorID             uint        `gorm:"not null"`
+	MaxRounds             *int        `gorm:"default:null"` // nil = endless
+	QuestionType          string      `gorm:"not null"`     // title, artist, both
+	QuizStyle             string      `gorm:"not null"`     // fixed, progressive
+	FixedTimeLimit        int         `gorm:"default:30"`   // seconds for fixed mode (1, 5, 10, 30, 60)
+	CategoryID            *uint       `gorm:"index"`        // Legacy single-category filter; see CategoryIDs
+	CategoryIDs           CategoryIDs `gorm:"type:jsonb"`
+	VotedOnly             bool        `gorm:"default:false"`
+	VotedRatio            *float64    `gorm:"default:null"`
+	CoversOnly            bool        `gorm:"default:false"`
+	OriginalsOnly         bool        `gorm:"default:false"`
+	FuzzyInput            bool        `gorm:"default:true"`  // use fuzzy search dropdowns vs free text
+	OneOfArtists          bool        `gorm:"default:false"` // correct if at least one artist matches
+	FilterByGuessedArtist bool        `gorm:"default:false"` // when question_type=both, narrow title dropdown to songs by the guessed artist
+	QuizState             QuizState   `gorm:"type:jsonb"`
+	Status                string      `gorm:"default:'setup'"` // setup, in_progress
+	CreatedAt             time.Time
+	LastActive            time.Time `gorm:"index"`
 
 	// Relationships
 	Creator  User      `gorm:"foreignKey:CreatorID;references:UserID"`
@@ -34,36 +35,36 @@ type QuizRoom struct {
 
 // QuizState holds all rounds played so far
 type QuizState struct {
-	Rounds       []QuizRound   `json:"rounds"`
-	Scores       []PlayerScore `json:"scores"`
-	CurrentRound int           `json:"current_round"` // 1-indexed, 0 = not started
-	CurrentStage int           `json:"current_stage"` // index into ProgressiveStages (0-4), only for progressive mode
-	StageReady   map[string]bool `json:"stage_ready"` // user_id -> ready to advance the current stage
+	Rounds       []QuizRound     `json:"rounds"`
+	Scores       []PlayerScore   `json:"scores"`
+	CurrentRound int             `json:"current_round"` // 1-indexed, 0 = not started
+	CurrentStage int             `json:"current_stage"` // index into ProgressiveStages (0-4), only for progressive mode
+	StageReady   map[string]bool `json:"stage_ready"`   // user_id -> ready to advance the current stage
 }
 
 // QuizRound represents a single quiz round
 type QuizRound struct {
-	RoundNumber    int             `json:"round_number"`
-	Song           QuizSong        `json:"song"`
-	AudioStartTime int            `json:"audio_start_time"` // seconds into the video
-	UserGuesses    []UserGuess     `json:"user_guesses"`
-	Status         string          `json:"status"` // waiting, playing, completed
-	CompletedAt    *time.Time      `json:"completed_at"`
+	RoundNumber    int         `json:"round_number"`
+	Song           QuizSong    `json:"song"`
+	AudioStartTime int         `json:"audio_start_time"` // seconds into the video
+	UserGuesses    []UserGuess `json:"user_guesses"`
+	Status         string      `json:"status"` // waiting, playing, completed
+	CompletedAt    *time.Time  `json:"completed_at"`
 }
 
 // QuizSong holds the correct answer data for a round
 type QuizSong struct {
-	SongID           uint     `json:"song_id"`
-	TitleOriginal    string   `json:"title_original"`
-	TitleEnglish     string   `json:"title_english"`
-	Artists          []QuizArtist `json:"artists"`
-	Units            []QuizUnit   `json:"units"`
-	ThumbnailURL     string   `json:"thumbnail_url"`
-	SourceURL        string   `json:"source_url"`
-	EmbedURL         string   `json:"embed_url"`
-	CategoryName     string   `json:"category_name"`
-	IsCover          bool     `json:"is_cover"`
-	AverageRating    float64  `json:"average_rating"`
+	SongID        uint         `json:"song_id"`
+	TitleOriginal string       `json:"title_original"`
+	TitleEnglish  string       `json:"title_english"`
+	Artists       []QuizArtist `json:"artists"`
+	Units         []QuizUnit   `json:"units"`
+	ThumbnailURL  string       `json:"thumbnail_url"`
+	SourceURL     string       `json:"source_url"`
+	EmbedURL      string       `json:"embed_url"`
+	CategoryName  string       `json:"category_name"`
+	IsCover       bool         `json:"is_cover"`
+	AverageRating float64      `json:"average_rating"`
 }
 
 // QuizArtist stores artist info for answer matching
@@ -82,14 +83,14 @@ type QuizUnit struct {
 
 // UserGuess tracks a user's guess for a round
 type UserGuess struct {
-	UserID         string     `json:"user_id"`
-	Username       string     `json:"username"`
-	TitleGuess     string     `json:"title_guess"`
-	ArtistGuess    string     `json:"artist_guess"`
-	TitleCorrect   bool       `json:"title_correct"`
-	ArtistCorrect  bool       `json:"artist_correct"`
-	TitleStage     int        `json:"title_stage"`   // stage at which title was guessed correctly (0 = not guessed)
-	ArtistStage    int        `json:"artist_stage"`  // stage at which artist was guessed correctly (0 = not guessed)
+	UserID           string     `json:"user_id"`
+	Username         string     `json:"username"`
+	TitleGuess       string     `json:"title_guess"`
+	ArtistGuess      string     `json:"artist_guess"`
+	TitleCorrect     bool       `json:"title_correct"`
+	ArtistCorrect    bool       `json:"artist_correct"`
+	TitleStage       int        `json:"title_stage"`  // stage at which title was guessed correctly (0 = not guessed)
+	ArtistStage      int        `json:"artist_stage"` // stage at which artist was guessed correctly (0 = not guessed)
 	TitlePoints      int        `json:"title_points"`
 	ArtistPoints     int        `json:"artist_points"`
 	TotalPoints      int        `json:"total_points"`

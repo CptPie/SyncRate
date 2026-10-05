@@ -46,15 +46,10 @@
             </div>
 
             <div class="form-group">
-              <label for="category-filter">Category Filter:</label>
-              <select id="category-filter" class="filter-select">
-                <option value="">All Categories</option>
-                {{range .categories}}
-                <option value="{{.CategoryID}}">{{.Name}}</option>
-                {{end}}
-              </select>
+              <label id="category-filter-label">Category Filter:</label>
+              <div id="category-filter"></div>
               <p class="checkbox-description">
-                Only include songs from a specific category
+                Only include songs from the selected categories (all by default)
               </p>
             </div>
 
@@ -149,6 +144,16 @@
     </div>
 
     <script src="/static/js/theme-toggle.js"></script>
+    <script src="/static/js/category-multi-select.js"></script>
+    <script>
+      // Category filter: any combination of categories, all by default.
+      const categoryPicker = CategoryMultiSelect.mount("category-filter", {
+        categories: [
+          {{range .categories}}{ CategoryID: {{.CategoryID}}, Name: {{.Name}} },
+          {{end}}
+        ],
+      });
+    </script>
     <script>
       // Toggle voted ratio visibility based on voted-only checkbox
       document
@@ -178,7 +183,8 @@
 
           // Get values
           const treeSize = parseInt(document.getElementById("tree-size").value);
-          const categoryId = document.getElementById("category-filter").value;
+          // Falls back to every category if the picker failed to mount.
+          const categoryIds = categoryPicker ? categoryPicker.getSelectedNumbers() : [];
           const votedOnly =
             document.getElementById("voted-only-filter").checked;
           const votedRatio = parseFloat(
@@ -199,8 +205,8 @@
             video_sync_enabled: videoSyncEnabled,
           };
 
-          if (categoryId) {
-            requestBody.category_id = parseInt(categoryId);
+          if (categoryIds.length) {
+            requestBody.category_ids = categoryIds;
           }
 
           if (votedOnly) {

@@ -88,7 +88,7 @@ func PostCreateTournamentRoom(db *gorm.DB) gin.HandlerFunc {
 		// Parse request body
 		var requestBody struct {
 			TreeSize         int      `json:"tree_size"`
-			CategoryID       *uint    `json:"category_id"`
+			CategoryIDs      []uint   `json:"category_ids"`
 			VotedOnly        bool     `json:"voted_only"`
 			VotedRatio       *float64 `json:"voted_ratio"`
 			CoversOnly       bool     `json:"covers_only"`
@@ -112,7 +112,7 @@ func PostCreateTournamentRoom(db *gorm.DB) gin.HandlerFunc {
 		roomID := generateTournamentRoomCode()
 
 		// Select songs for the tournament
-		songs, songWarning, err := selectTournamentSongs(db, userID.(uint), requestBody.TreeSize, requestBody.CategoryID, requestBody.VotedOnly, requestBody.VotedRatio, requestBody.CoversOnly, requestBody.OriginalsOnly)
+		songs, songWarning, err := selectTournamentSongs(db, userID.(uint), requestBody.TreeSize, requestBody.CategoryIDs, requestBody.VotedOnly, requestBody.VotedRatio, requestBody.CoversOnly, requestBody.OriginalsOnly)
 		if err != nil {
 			log.Printf("Error selecting tournament songs: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to select songs: %v", err)})
@@ -132,7 +132,7 @@ func PostCreateTournamentRoom(db *gorm.DB) gin.HandlerFunc {
 			RoomID:           roomID,
 			CreatorID:        userID.(uint),
 			TreeSize:         requestBody.TreeSize,
-			CategoryID:       requestBody.CategoryID,
+			CategoryIDs:      requestBody.CategoryIDs,
 			VotedOnly:        requestBody.VotedOnly,
 			VotedRatio:       requestBody.VotedRatio,
 			CoversOnly:       requestBody.CoversOnly,
@@ -171,16 +171,17 @@ func PostCreateTournamentRoom(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-// selectTournamentSongs selects songs for the tournament based on filters
-func selectTournamentSongs(db *gorm.DB, userID uint, count int, categoryID *uint, votedOnly bool, votedRatio *float64, coversOnly bool, originalsOnly bool) ([]models.Song, string, error) {
+// selectTournamentSongs selects songs for the tournament based on filters.
+// An empty categoryIDs means every category.
+func selectTournamentSongs(db *gorm.DB, userID uint, count int, categoryIDs []uint, votedOnly bool, votedRatio *float64, coversOnly bool, originalsOnly bool) ([]models.Song, string, error) {
 	var songs []models.Song
 
 	// Build base query
 	baseQuery := db.Preload("Artists").Preload("Units").Preload("Category")
 
 	// Apply category filter
-	if categoryID != nil {
-		baseQuery = baseQuery.Where("category_id = ?", *categoryID)
+	if len(categoryIDs) > 0 {
+		baseQuery = baseQuery.Where("category_id IN ?", categoryIDs)
 	}
 
 	// Apply covers filter
@@ -236,8 +237,8 @@ func selectTournamentSongs(db *gorm.DB, userID uint, count int, categoryID *uint
 			Preload("Artists").Preload("Units").Preload("Category").
 			Joins("INNER JOIN votes ON votes.song_id = songs.song_id AND votes.user_id = ?", userID)
 
-		if categoryID != nil {
-			votedQuery = votedQuery.Where("songs.category_id = ?", *categoryID)
+		if len(categoryIDs) > 0 {
+			votedQuery = votedQuery.Where("songs.category_id IN ?", categoryIDs)
 		}
 		if coversOnly {
 			votedQuery = votedQuery.Where("songs.is_cover = ?", true)
@@ -256,8 +257,8 @@ func selectTournamentSongs(db *gorm.DB, userID uint, count int, categoryID *uint
 			Preload("Artists").Preload("Units").Preload("Category").
 			Where("songs.song_id NOT IN (?)", db.Table("votes").Select("song_id").Where("user_id = ?", userID))
 
-		if categoryID != nil {
-			unvotedQuery = unvotedQuery.Where("songs.category_id = ?", *categoryID)
+		if len(categoryIDs) > 0 {
+			unvotedQuery = unvotedQuery.Where("songs.category_id IN ?", categoryIDs)
 		}
 		if coversOnly {
 			unvotedQuery = unvotedQuery.Where("songs.is_cover = ?", true)
@@ -297,8 +298,8 @@ func selectTournamentSongs(db *gorm.DB, userID uint, count int, categoryID *uint
 		if len(existingIDs) > 0 {
 			fillQuery = fillQuery.Where("song_id NOT IN (?)", existingIDs)
 		}
-		if categoryID != nil {
-			fillQuery = fillQuery.Where("category_id = ?", *categoryID)
+		if len(categoryIDs) > 0 {
+			fillQuery = fillQuery.Where("category_id IN ?", categoryIDs)
 		}
 		if coversOnly {
 			fillQuery = fillQuery.Where("is_cover = ?", true)

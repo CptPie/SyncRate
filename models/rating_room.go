@@ -3,15 +3,16 @@ package models
 import "time"
 
 type RatingRoom struct {
-	RoomID          string    `gorm:"primaryKey;size:8"`
-	CreatorID       uint      `gorm:"not null"`
-	CurrentSongID   *uint     `gorm:"index"`
-	CategoryID      *uint     `gorm:"index"`
-	CoversOnly       bool      `gorm:"default:false"`
-	VideoSyncEnabled *bool     `gorm:"default:true"`
-	UnvotedSongsOnly *bool     `gorm:"default:true"`
-	CreatedAt       time.Time
-	LastActive      time.Time `gorm:"index"`
+	RoomID           string      `gorm:"primaryKey;size:8"`
+	CreatorID        uint        `gorm:"not null"`
+	CurrentSongID    *uint       `gorm:"index"`
+	CategoryID       *uint       `gorm:"index"` // Legacy single-category filter; see CategoryIDs
+	CategoryIDs      CategoryIDs `gorm:"type:jsonb"`
+	CoversOnly       bool        `gorm:"default:false"`
+	VideoSyncEnabled *bool       `gorm:"default:true"`
+	UnvotedSongsOnly *bool       `gorm:"default:true"`
+	CreatedAt        time.Time
+	LastActive       time.Time `gorm:"index"`
 
 	// Relationships
 	Creator     User      `gorm:"foreignKey:CreatorID;references:UserID"`

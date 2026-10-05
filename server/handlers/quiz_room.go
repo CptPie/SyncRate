@@ -16,8 +16,8 @@ import (
 	wsocket "github.com/CptPie/SyncRate/server/websocket"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"gorm.io/gorm"
 	"golang.org/x/text/unicode/norm"
+	"gorm.io/gorm"
 )
 
 var (
@@ -82,18 +82,18 @@ func PostCreateQuizRoom(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		var requestBody struct {
-			MaxRounds      *int     `json:"max_rounds"`
-			QuestionType   string   `json:"question_type"`
-			QuizStyle      string   `json:"quiz_style"`
-			FixedTimeLimit int      `json:"fixed_time_limit"`
-			CategoryID     *uint    `json:"category_id"`
-			VotedOnly      bool     `json:"voted_only"`
-			VotedRatio     *float64 `json:"voted_ratio"`
-			CoversOnly     bool     `json:"covers_only"`
-			OriginalsOnly  bool     `json:"originals_only"`
-			FuzzyInput     bool     `json:"fuzzy_input"`
-			OneOfArtists   bool     `json:"one_of_artists"`
-			FilterByGuessedArtist bool `json:"filter_by_guessed_artist"`
+			MaxRounds             *int     `json:"max_rounds"`
+			QuestionType          string   `json:"question_type"`
+			QuizStyle             string   `json:"quiz_style"`
+			FixedTimeLimit        int      `json:"fixed_time_limit"`
+			CategoryIDs           []uint   `json:"category_ids"`
+			VotedOnly             bool     `json:"voted_only"`
+			VotedRatio            *float64 `json:"voted_ratio"`
+			CoversOnly            bool     `json:"covers_only"`
+			OriginalsOnly         bool     `json:"originals_only"`
+			FuzzyInput            bool     `json:"fuzzy_input"`
+			OneOfArtists          bool     `json:"one_of_artists"`
+			FilterByGuessedArtist bool     `json:"filter_by_guessed_artist"`
 		}
 
 		if err := c.ShouldBindJSON(&requestBody); err != nil {
@@ -123,24 +123,24 @@ func PostCreateQuizRoom(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		// Check song availability and generate warnings
-		songWarning := checkQuizSongAvailability(db, userID.(uint), requestBody.CategoryID, requestBody.VotedOnly, requestBody.VotedRatio, requestBody.CoversOnly, requestBody.OriginalsOnly, requestBody.MaxRounds)
+		songWarning := checkQuizSongAvailability(db, userID.(uint), requestBody.CategoryIDs, requestBody.VotedOnly, requestBody.VotedRatio, requestBody.CoversOnly, requestBody.OriginalsOnly, requestBody.MaxRounds)
 
 		roomID := generateQuizRoomCode()
 
 		room := models.QuizRoom{
-			RoomID:         roomID,
-			CreatorID:      userID.(uint),
-			MaxRounds:      requestBody.MaxRounds,
-			QuestionType:   requestBody.QuestionType,
-			QuizStyle:      requestBody.QuizStyle,
-			FixedTimeLimit: requestBody.FixedTimeLimit,
-			CategoryID:     requestBody.CategoryID,
-			VotedOnly:      requestBody.VotedOnly,
-			VotedRatio:     requestBody.VotedRatio,
-			CoversOnly:     requestBody.CoversOnly,
-			OriginalsOnly:  requestBody.OriginalsOnly,
-			FuzzyInput:     requestBody.FuzzyInput,
-			OneOfArtists:   requestBody.OneOfArtists,
+			RoomID:                roomID,
+			CreatorID:             userID.(uint),
+			MaxRounds:             requestBody.MaxRounds,
+			QuestionType:          requestBody.QuestionType,
+			QuizStyle:             requestBody.QuizStyle,
+			FixedTimeLimit:        requestBody.FixedTimeLimit,
+			CategoryIDs:           requestBody.CategoryIDs,
+			VotedOnly:             requestBody.VotedOnly,
+			VotedRatio:            requestBody.VotedRatio,
+			CoversOnly:            requestBody.CoversOnly,
+			OriginalsOnly:         requestBody.OriginalsOnly,
+			FuzzyInput:            requestBody.FuzzyInput,
+			OneOfArtists:          requestBody.OneOfArtists,
 			FilterByGuessedArtist: requestBody.FilterByGuessedArtist,
 			QuizState: models.QuizState{
 				Rounds:       []models.QuizRound{},
@@ -212,8 +212,8 @@ func GetQuizRoom(db *gorm.DB) gin.HandlerFunc {
 		if room.FuzzyInput {
 			var songs []models.Song
 			query := db.Model(&models.Song{})
-			if room.CategoryID != nil {
-				query = query.Where("category_id = ?", *room.CategoryID)
+			if categoryIDs := room.CategoryIDs.Resolve(room.CategoryID); len(categoryIDs) > 0 {
+				query = query.Where("category_id IN ?", categoryIDs)
 			}
 			if room.CoversOnly {
 				query = query.Where("is_cover = ?", true)
@@ -363,19 +363,19 @@ func buildQuizStateForClient(room models.QuizRoom, userID string) map[string]int
 	}
 
 	return map[string]interface{}{
-		"status":           room.Status,
-		"question_type":    room.QuestionType,
-		"quiz_style":       room.QuizStyle,
-		"fixed_time_limit": room.FixedTimeLimit,
-		"fuzzy_input":      room.FuzzyInput,
-		"one_of_artists":   room.OneOfArtists,
+		"status":                   room.Status,
+		"question_type":            room.QuestionType,
+		"quiz_style":               room.QuizStyle,
+		"fixed_time_limit":         room.FixedTimeLimit,
+		"fuzzy_input":              room.FuzzyInput,
+		"one_of_artists":           room.OneOfArtists,
 		"filter_by_guessed_artist": room.FilterByGuessedArtist,
-		"max_rounds":       room.MaxRounds,
-		"rounds":           sanitizedRounds,
-		"scores":           room.QuizState.Scores,
-		"current_round":    room.QuizState.CurrentRound,
-		"current_stage":    room.QuizState.CurrentStage,
-		"stage_ready":      room.QuizState.StageReady,
+		"max_rounds":               room.MaxRounds,
+		"rounds":                   sanitizedRounds,
+		"scores":                   room.QuizState.Scores,
+		"current_round":            room.QuizState.CurrentRound,
+		"current_stage":            room.QuizState.CurrentStage,
+		"stage_ready":              room.QuizState.StageReady,
 	}
 }
 
@@ -408,7 +408,7 @@ func handleStartQuiz(db *gorm.DB, roomID string) {
 	err := db.Model(&models.QuizRoom{}).
 		Where("room_id = ?", roomID).
 		Updates(map[string]interface{}{
-			"status":     "in_progress",
+			"status":      "in_progress",
 			"last_active": time.Now(),
 		}).Error
 
@@ -720,13 +720,13 @@ func handleQuizVoteUpdate(db *gorm.DB, roomID, userID string, data json.RawMessa
 // --- Song selection ---
 
 // checkQuizSongAvailability counts available songs and warns about ratio shortfalls
-func checkQuizSongAvailability(db *gorm.DB, userID uint, categoryID *uint, votedOnly bool, votedRatio *float64, coversOnly, originalsOnly bool, maxRounds *int) string {
+func checkQuizSongAvailability(db *gorm.DB, userID uint, categoryIDs []uint, votedOnly bool, votedRatio *float64, coversOnly, originalsOnly bool, maxRounds *int) string {
 	// Count total available songs with filters
 	countQuery := func(baseQ *gorm.DB) int64 {
 		var count int64
 		q := baseQ.Model(&models.Song{})
-		if categoryID != nil {
-			q = q.Where("category_id = ?", *categoryID)
+		if len(categoryIDs) > 0 {
+			q = q.Where("category_id IN ?", categoryIDs)
 		}
 		if coversOnly {
 			q = q.Where("is_cover = ?", true)
@@ -801,8 +801,8 @@ func selectQuizSong(db *gorm.DB, room *models.QuizRoom) *models.Song {
 	// Build base filters (category, covers, already-used)
 	applyBaseFilters := func(q *gorm.DB) *gorm.DB {
 		q = q.Preload("Artists").Preload("Units").Preload("Category")
-		if room.CategoryID != nil {
-			q = q.Where("songs.category_id = ?", *room.CategoryID)
+		if categoryIDs := room.CategoryIDs.Resolve(room.CategoryID); len(categoryIDs) > 0 {
+			q = q.Where("songs.category_id IN ?", categoryIDs)
 		}
 		if room.CoversOnly {
 			q = q.Where("songs.is_cover = ?", true)

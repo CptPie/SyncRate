@@ -26,12 +26,10 @@
               </div>
             </div>
             <div class="filter-group">
-              <label for="category-filter" class="form-label"
+              <label id="category-filter-label" class="form-label"
                 >Filter by Category</label
               >
-              <select id="category-filter" class="filter-select">
-                <option value="">All Categories</option>
-              </select>
+              <div id="category-filter"></div>
               <label for="type-filter" class="form-label" style="margin-top: 8px"
                 >Type</label
               >
@@ -89,6 +87,7 @@
     </div>
 
     <script src="/static/js/theme-toggle.js"></script>
+    <script src="/static/js/category-multi-select.js"></script>
     {{if .votes}}
     <script>
       (function () {
@@ -96,7 +95,6 @@
         const categoriesData = JSON.parse('{{.categoriesJSON}}');
 
         const searchInput = document.getElementById("vote-search");
-        const categoryFilter = document.getElementById("category-filter");
         const typeFilter = document.getElementById("type-filter");
         const ratingFilter = document.getElementById("rating-filter");
         const sortBy = document.getElementById("sort-by");
@@ -104,14 +102,6 @@
         const container = document.getElementById("votes-container");
         const noResults = document.getElementById("no-results");
         const stats = document.getElementById("search-stats");
-
-        // Populate category options
-        categoriesData.forEach(function (cat) {
-          const opt = document.createElement("option");
-          opt.value = String(cat.CategoryID);
-          opt.textContent = cat.Name;
-          categoryFilter.appendChild(opt);
-        });
 
         // Populate rating options (10 down to 1)
         for (let r = 10; r >= 1; r--) {
@@ -163,12 +153,14 @@
 
         function getFiltered() {
           const search = searchInput.value.trim().toLowerCase();
-          const category = categoryFilter.value;
+          // Empty means no category narrowing.
+          const categories = categoryPicker ? categoryPicker.getSelected() : [];
           const type = typeFilter.value;
           const rating = ratingFilter.value;
 
           let result = votesData.filter(function (v) {
-            if (category && String(v.category_id) !== category) return false;
+            if (categories.length && !categories.includes(String(v.category_id)))
+              return false;
             if (type === "covers" && !v.is_cover) return false;
             if (type === "originals" && v.is_cover) return false;
             if (rating && String(v.rating) !== rating) return false;
@@ -225,8 +217,12 @@
           }
         }
 
+        const categoryPicker = CategoryMultiSelect.mount("category-filter", {
+          categories: categoriesData,
+          onChange: render,
+        });
+
         searchInput.addEventListener("input", render);
-        categoryFilter.addEventListener("change", render);
         typeFilter.addEventListener("change", render);
         ratingFilter.addEventListener("change", render);
         sortBy.addEventListener("change", render);

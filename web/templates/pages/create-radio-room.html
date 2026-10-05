@@ -28,14 +28,9 @@
                     <p class="filter-description">Customize which songs will play in your radio room</p>
 
                     <div class="form-group">
-                        <label for="category-filter">Category:</label>
-                        <select id="category-filter" class="filter-select">
-                            <option value="">All Categories</option>
-                            {{range .categories}}
-                            <option value="{{.CategoryID}}">{{.Name}}</option>
-                            {{end}}
-                        </select>
-                        <p class="checkbox-description">Only play songs from a specific category</p>
+                        <label id="category-filter-label">Category:</label>
+                        <div id="category-filter"></div>
+                        <p class="checkbox-description">Only play songs from the selected categories (all by default)</p>
                     </div>
 
                     <div class="form-group">
@@ -99,6 +94,16 @@
     </div>
 
     <script src="/static/js/theme-toggle.js"></script>
+    <script src="/static/js/category-multi-select.js"></script>
+    <script>
+      // Category filter: any combination of categories, all by default.
+      const categoryPicker = CategoryMultiSelect.mount("category-filter", {
+        categories: [
+          {{range .categories}}{ CategoryID: {{.CategoryID}}, Name: {{.Name}} },
+          {{end}}
+        ],
+      });
+    </script>
     <script>
         // Toggle rating filter visibility
         document.getElementById('enable-rating-filter').addEventListener('change', function() {
@@ -112,15 +117,16 @@
             btn.textContent = 'Creating...';
 
             // Get filter values
-            const categoryId = document.getElementById('category-filter').value;
+            // Falls back to every category if the picker failed to mount.
+            const categoryIds = categoryPicker ? categoryPicker.getSelectedNumbers() : [];
             const enableRatingFilter = document.getElementById('enable-rating-filter').checked;
             const minRating = document.getElementById('min-rating').value;
             const includeCovers = document.getElementById('include-covers').checked;
 
             // Build request body
             const requestBody = {};
-            if (categoryId) {
-                requestBody.category_id = parseInt(categoryId);
+            if (categoryIds.length) {
+                requestBody.category_ids = categoryIds;
             }
             if (enableRatingFilter) {
                 requestBody.min_rating = parseInt(minRating);

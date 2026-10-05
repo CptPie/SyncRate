@@ -20,7 +20,8 @@ class SearchFilter {
 
         this.filteredData = [...this.data];
         this.currentSearchTerm = '';
-        this.currentCategoryFilter = '';
+        // Selected category IDs as strings; empty means every category.
+        this.currentCategoryFilters = [];
         this.currentCoversFilter = false;
 
         this.init();
@@ -28,13 +29,12 @@ class SearchFilter {
 
     init() {
         this.setupEventListeners();
-        this.populateCategoryFilter();
+        this.setupCategoryFilter();
         this.filterAndRender(); // Use filterAndRender to ensure pagination is set up
     }
 
     setupEventListeners() {
         const searchInput = document.getElementById(this.searchInputId);
-        const categoryFilter = document.getElementById(this.categoryFilterId);
         const coversFilter = document.getElementById(this.coversFilterId);
         const prevButton = document.getElementById('prev-page');
         const nextButton = document.getElementById('next-page');
@@ -43,14 +43,6 @@ class SearchFilter {
             searchInput.addEventListener('input', (e) => {
                 this.currentSearchTerm = e.target.value.toLowerCase().trim();
                 this.currentPage = 1; // Reset to first page on new search
-                this.filterAndRender();
-            });
-        }
-
-        if (categoryFilter) {
-            categoryFilter.addEventListener('change', (e) => {
-                this.currentCategoryFilter = e.target.value;
-                this.currentPage = 1; // Reset to first page on filter change
                 this.filterAndRender();
             });
         }
@@ -101,19 +93,24 @@ class SearchFilter {
         }
     }
 
-    populateCategoryFilter() {
-        const categoryFilter = document.getElementById(this.categoryFilterId);
-        if (!categoryFilter || !this.categoriesData.length) return;
+    setupCategoryFilter() {
+        if (!this.categoryFilterId || !this.categoriesData.length) return;
 
-        // Clear existing options except "All Categories"
-        categoryFilter.innerHTML = '<option value="">All Categories</option>';
+        const mount = document.getElementById(this.categoryFilterId);
+        if (!mount) return;
 
-        // Add category options
-        this.categoriesData.forEach(category => {
-            const option = document.createElement('option');
-            option.value = category.CategoryID;
-            option.textContent = category.Name;
-            categoryFilter.appendChild(option);
+        if (typeof CategoryMultiSelect === 'undefined') {
+            console.error('CategoryMultiSelect not loaded; category filter unavailable');
+            return;
+        }
+
+        this.categoryPicker = CategoryMultiSelect.mount(mount, {
+            categories: this.categoriesData,
+            onChange: (ids) => {
+                this.currentCategoryFilters = ids;
+                this.currentPage = 1; // Reset to first page on filter change
+                this.filterAndRender();
+            }
         });
     }
 
@@ -232,11 +229,13 @@ class SearchFilter {
     }
 
     matchesCategory(item) {
-        if (!this.currentCategoryFilter) return true;
+        // No selection means no narrowing, so everything passes.
+        if (!this.currentCategoryFilters.length) return true;
 
-        // Check if item has a category and it matches the filter
-        const categoryId = item.Category?.CategoryID || item.CategoryID;
-        return categoryId && categoryId.toString() === this.currentCategoryFilter;
+        // Check if item has a category and it matches one of the selected ones
+        const categoryId = item.Category?.CategoryID ?? item.CategoryID;
+        return categoryId != null &&
+            this.currentCategoryFilters.includes(categoryId.toString());
     }
 
     matchesCovers(item) {

@@ -106,10 +106,10 @@ func PostCreateRatingRoom(db *gorm.DB) gin.HandlerFunc {
 
 		// Parse request body for filters
 		var requestBody struct {
-			CategoryID       *uint `json:"category_id"`
-			CoversOnly       bool  `json:"covers_only"`
-			VideoSyncEnabled bool  `json:"video_sync_enabled"`
-			UnvotedSongsOnly bool  `json:"unvoted_songs_only"`
+			CategoryIDs      []uint `json:"category_ids"`
+			CoversOnly       bool   `json:"covers_only"`
+			VideoSyncEnabled bool   `json:"video_sync_enabled"`
+			UnvotedSongsOnly bool   `json:"unvoted_songs_only"`
 		}
 
 		// Bind JSON, but don't fail if body is empty (filters are optional)
@@ -125,14 +125,14 @@ func PostCreateRatingRoom(db *gorm.DB) gin.HandlerFunc {
 
 		// Create room in database
 		room := models.RatingRoom{
-			RoomID:          roomID,
-			CreatorID:       userID.(uint),
-			CategoryID:      requestBody.CategoryID,
-			CoversOnly:      requestBody.CoversOnly,
+			RoomID:           roomID,
+			CreatorID:        userID.(uint),
+			CategoryIDs:      requestBody.CategoryIDs,
+			CoversOnly:       requestBody.CoversOnly,
 			VideoSyncEnabled: &requestBody.VideoSyncEnabled,
-		UnvotedSongsOnly: &requestBody.UnvotedSongsOnly,
-			CreatedAt:       time.Now(),
-			LastActive:      time.Now(),
+			UnvotedSongsOnly: &requestBody.UnvotedSongsOnly,
+			CreatedAt:        time.Now(),
+			LastActive:       time.Now(),
 		}
 
 		if err := db.Create(&room).Error; err != nil {
@@ -246,8 +246,8 @@ func handleRoomConnection(db *gorm.DB, roomID, userID string, conn *websocket.Co
 	// Check if room exists in database
 	if err := checkRoomExists(db, roomID); err != nil {
 		roomManager.SendToClient(userID, wsocket.WSMessage{
-			Type: "error",
-			Data: json.RawMessage(`{"error":"This rating room no longer exists"}`),
+			Type:      "error",
+			Data:      json.RawMessage(`{"error":"This rating room no longer exists"}`),
 			Timestamp: time.Now(),
 		})
 		return
@@ -385,8 +385,8 @@ func handleRoomMessage(db *gorm.DB, roomID, userID string, msg wsocket.WSMessage
 	if err := checkRoomExists(db, roomID); err != nil {
 		log.Printf("Room %s no longer exists: %v", roomID, err)
 		roomManager.SendToClient(userID, wsocket.WSMessage{
-			Type: "error",
-			Data: json.RawMessage(`{"error":"This rating room no longer exists. The page will reload."}`),
+			Type:      "error",
+			Data:      json.RawMessage(`{"error":"This rating room no longer exists. The page will reload."}`),
 			Timestamp: time.Now(),
 		})
 		return
@@ -505,8 +505,8 @@ func findNextUnratedSong(db *gorm.DB, roomID string) *models.Song {
 	baseQuery := db.Preload("Artists").Preload("Units").Preload("Albums").Preload("Category")
 
 	// Apply category filter if set
-	if dbRoom.CategoryID != nil {
-		baseQuery = baseQuery.Where("category_id = ?", *dbRoom.CategoryID)
+	if categoryIDs := dbRoom.CategoryIDs.Resolve(dbRoom.CategoryID); len(categoryIDs) > 0 {
+		baseQuery = baseQuery.Where("category_id IN ?", categoryIDs)
 	}
 
 	// Apply covers filter if set

@@ -22,13 +22,8 @@
               <div class="search-stats" id="search-stats">{{len .albums}} albums total</div>
             </div>
             <div class="filter-group">
-              <label for="category-filter" class="form-label">Filter by Category</label>
-              <select id="category-filter" class="filter-select">
-                <option value="">All Categories</option>
-                {{range .categories}}
-                <option value="{{.CategoryID}}">{{.Name}}</option>
-                {{end}}
-              </select>
+              <label id="category-filter-label" class="form-label">Filter by Category</label>
+              <div id="category-filter"></div>
             </div>
           </div>
         </div>
@@ -130,6 +125,7 @@
     </div>
 
     <script src="/static/js/theme-toggle.js"></script>
+    <script src="/static/js/category-multi-select.js"></script>
     <script src="/static/js/search-filter.js"></script>
     <script>
       const albumsData = JSON.parse("{{.albumsJSON}}");

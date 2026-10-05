@@ -85,9 +85,9 @@ func PostCreateRadioRoom(db *gorm.DB) gin.HandlerFunc {
 
 		// Parse request body for filters
 		var requestBody struct {
-			CategoryID    *uint `json:"category_id"`
-			MinRating     *int  `json:"min_rating"`
-			IncludeCovers bool  `json:"include_covers"`
+			CategoryIDs   []uint `json:"category_ids"`
+			MinRating     *int   `json:"min_rating"`
+			IncludeCovers bool   `json:"include_covers"`
 		}
 
 		// Bind JSON, but don't fail if body is empty (filters are optional)
@@ -104,7 +104,7 @@ func PostCreateRadioRoom(db *gorm.DB) gin.HandlerFunc {
 		room := models.RadioRoom{
 			RoomID:        roomID,
 			CreatorID:     userID.(uint),
-			CategoryID:    requestBody.CategoryID,
+			CategoryIDs:   requestBody.CategoryIDs,
 			MinRating:     requestBody.MinRating,
 			IncludeCovers: requestBody.IncludeCovers,
 			CreatedAt:     time.Now(),
@@ -222,8 +222,8 @@ func handleRadioRoomConnection(db *gorm.DB, roomID, userID string, conn *websock
 	// Check if room exists in database
 	if err := checkRadioRoomExists(db, roomID); err != nil {
 		radioRoomManager.SendToClient(userID, wsocket.WSMessage{
-			Type: "error",
-			Data: json.RawMessage(`{"error":"This radio room no longer exists"}`),
+			Type:      "error",
+			Data:      json.RawMessage(`{"error":"This radio room no longer exists"}`),
 			Timestamp: time.Now(),
 		})
 		return
@@ -275,8 +275,8 @@ func handleRadioRoomMessage(db *gorm.DB, roomID, userID string, msg wsocket.WSMe
 	if err := checkRadioRoomExists(db, roomID); err != nil {
 		log.Printf("Radio room %s no longer exists: %v", roomID, err)
 		radioRoomManager.SendToClient(userID, wsocket.WSMessage{
-			Type: "error",
-			Data: json.RawMessage(`{"error":"This radio room no longer exists. The page will reload."}`),
+			Type:      "error",
+			Data:      json.RawMessage(`{"error":"This radio room no longer exists. The page will reload."}`),
 			Timestamp: time.Now(),
 		})
 		return
@@ -498,8 +498,8 @@ func normalizeTitle(title string) string {
 func radioFilteredSongQuery(db *gorm.DB, dbRoom models.RadioRoom) *gorm.DB {
 	query := db.Model(&models.Song{})
 
-	if dbRoom.CategoryID != nil {
-		query = query.Where("category_id = ?", *dbRoom.CategoryID)
+	if categoryIDs := dbRoom.CategoryIDs.Resolve(dbRoom.CategoryID); len(categoryIDs) > 0 {
+		query = query.Where("category_id IN ?", categoryIDs)
 	}
 
 	if !dbRoom.IncludeCovers {

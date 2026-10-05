@@ -714,6 +714,101 @@ input[type="color"]:focus {
   height: 16px; /* Reserve space so both columns have same height */
 }
 
+/* Category multi-select: a checkbox dropdown that reads as a .filter-select
+   when closed, used anywhere several categories can be picked at once. */
+.multi-select {
+  position: relative;
+  width: 100%;
+}
+
+.multi-select-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-medium);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  height: 42px;
+  box-sizing: border-box;
+  cursor: pointer;
+  text-align: left;
+}
+
+.multi-select-toggle:focus-visible {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(94, 129, 172, 0.2);
+}
+
+.multi-select-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.multi-select-caret {
+  color: var(--text-muted);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.multi-select-panel {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  min-width: 100%;
+  padding: 6px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-medium);
+  border-radius: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+  z-index: 1000;
+  box-shadow: 0 4px 10px var(--shadow-light);
+  box-sizing: border-box;
+}
+
+.multi-select-panel.is-open {
+  display: block;
+}
+
+.multi-select-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.multi-select-option:hover {
+  background: var(--bg-accent);
+}
+
+.multi-select-option input[type="checkbox"] {
+  margin: 0;
+  accent-color: var(--accent-primary);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.multi-select-divider {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--border-light);
+}
+
 
 /* Checkbox styling for filters */
 .filter-group .form-checkbox {

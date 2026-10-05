@@ -3,14 +3,15 @@ package models
 import "time"
 
 type RadioRoom struct {
-	RoomID         string    `gorm:"primaryKey;size:8"`
-	CreatorID      uint      `gorm:"not null"`
-	CurrentSongID  *uint     `gorm:"index"`
-	CategoryID     *uint     `gorm:"index"`
-	IncludeCovers  bool      `gorm:"default:false"`
-	MinRating      *int      `gorm:"default:null"` // Null means no rating filter
-	CreatedAt      time.Time
-	LastActive     time.Time `gorm:"index"`
+	RoomID        string      `gorm:"primaryKey;size:8"`
+	CreatorID     uint        `gorm:"not null"`
+	CurrentSongID *uint       `gorm:"index"`
+	CategoryID    *uint       `gorm:"index"` // Legacy single-category filter; see CategoryIDs
+	CategoryIDs   CategoryIDs `gorm:"type:jsonb"`
+	IncludeCovers bool        `gorm:"default:false"`
+	MinRating     *int        `gorm:"default:null"` // Null means no rating filter
+	CreatedAt     time.Time
+	LastActive    time.Time `gorm:"index"`
 
 	// Relationships
 	Creator     User      `gorm:"foreignKey:CreatorID;references:UserID"`
